@@ -1,0 +1,88 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+
+# =========================
+# Dependency / tooling
+# =========================
+uv.lock
+pip-wheel-metadata/
+poetry.lock
+pip-log.txt
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+*.out
+
+# =========================
+# Audio / Media (generated or debug)
+# =========================
+audio_debug/
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# =========================
+# Model / AI artifacts
+# =========================
+*.onnx
+*.pt
+*.pth
+*.ckpt
+*.bin
+models/
+checkpoints/
+
+# =========================
+# Cache / Temp
+# =========================
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Runtime / sockets
+# =========================
+*.sock
+*.pid
+
+# =========================
+# Secrets (IMPORTANT)
+# =========================
+*.pem
+*.key
+*.crt
+*.secrets
+secrets/

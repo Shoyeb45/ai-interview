@@ -1,0 +1,16 @@
+node_modules
+
+# Keep environment variables out of version control
+.env
+
+/src/generated
+
+dist/*
+dist
+logs
+./keys/*.pem
+.early.coverage
+
+coverage
+
+keys/*.pem

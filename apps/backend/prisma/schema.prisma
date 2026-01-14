@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+// User Table
+model User {
+  id       Int     @id @default(autoincrement())
+  name     String
+  email    String  @unique
+  password String
+  status   Boolean @default(true)
+  verified Boolean @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  roles     UserRoleRelation[]
+  keystores Keystore[]
+
+  @@index([email])
+}
+
+// Many to Many join table for assigning multiple role to one user
+model UserRoleRelation {
+  id     Int @id @default(autoincrement())
+  userId Int @map("user_id")
+  roleId Int
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+}
+
+model Role {
+  id     Int      @id @default(autoincrement())
+  code   RoleCode @unique
+  status Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  users UserRoleRelation[]
+
+  @@index([code])
+}
+
+enum RoleCode {
+  USER
+  ADMIN
+}
+
+// Keystore Table for JWT token management
+model Keystore {
+  id           Int     @id @default(autoincrement())
+  clientId     Int     @map("client_id")
+  primaryKey   String  @map("primary_key")
+  secondaryKey String  @map("secondary_key")
+  status       Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  client User @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([clientId, primaryKey, status])
+  @@index([clientId, primaryKey, secondaryKey])
+  @@map("keystores")
+}
+
+// ApiKey Table for API key management
+model ApiKey {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  version     Int      @default(1)
+  permissions Permission[] // Array of permission strings
+  comments    String[] // Array of comment strings
+  status      Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([key, status])
+  @@map("api_keys")
+}
+
+enum Permission {
+  GENERAL
+}
