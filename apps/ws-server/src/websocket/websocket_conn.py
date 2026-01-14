@@ -7,7 +7,12 @@ from fastapi import WebSocket, WebSocketDisconnect
 async def handle_websocket_message(ws: WebSocket, pc: RTCPeerConnection, should_stop: asyncio.Event):
     try:
         while not should_stop.is_set():
-            message = await ws.receive_text()
+            try:
+                # Add timeout so we can check should_stop periodically
+                message = await asyncio.wait_for(ws.receive_text(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue  # Check should_stop and loop again
+                
             data = json.loads(message)
 
             if data['type'] == 'offer':
@@ -18,14 +23,16 @@ async def handle_websocket_message(ws: WebSocket, pc: RTCPeerConnection, should_
 
                 await pc.setRemoteDescription(offer)
                 answer = await pc.createAnswer()
+                print(f"📋 Answer SDP:\n{answer.sdp}")
                 await pc.setLocalDescription(answer)
 
                 await ws.send_text(json.dumps({
                     'type': pc.localDescription.type,
                     'sdp': pc.localDescription.sdp
                 }))
+                print("✅ SDP answer sent to client")
                 
-            if data['type'] == 'ice':
+            elif data['type'] == 'ice':
                 if data.get("candidate"):
                     from aiortc.sdp import candidate_from_sdp
         
@@ -38,7 +45,7 @@ async def handle_websocket_message(ws: WebSocket, pc: RTCPeerConnection, should_
                     
     except WebSocketDisconnect:
         print("🔌 WebSocket disconnected by client")
-        should_stop.set()  # Signal other handlers to stop
+        should_stop.set()
     except json.JSONDecodeError as e:
         print('❌ Invalid JSON data from the frontend.')
         print(e)

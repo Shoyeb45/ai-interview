@@ -1,5 +1,5 @@
 from typing import Union
-from av import Packet, frame
+
 import numpy as np
 from scipy import signal
 
@@ -82,14 +82,3 @@ def downsample_48k_to_16k(pcm_48k: np.ndarray) -> np.ndarray:
     return result
 
 
-def get_mono_audio(raw, frame: Union[frame.Frame, Packet]):
-    # Handle stereo interleaved data
-    if raw.ndim == 2:
-        if raw.shape[1] == frame.samples * 2:
-            audio_mono = raw.reshape(-1)[::2]  # De-interleave
-        else:
-            audio_mono = raw[0]
-    else:
-        audio_mono = raw
-    
-    return audio_mono
