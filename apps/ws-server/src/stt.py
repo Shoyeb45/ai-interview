@@ -1,3 +1,4 @@
+import asyncio
 from faster_whisper import WhisperModel
 import numpy as np
 from src.constant import ENERGY_THRESHOLD
@@ -5,7 +6,7 @@ from webrtcvad import Vad
 
 model = WhisperModel('small.en', device='cpu', compute_type='int8')
 
-def transcribe_audio(speech: np.ndarray) -> str:
+def transcribe_audio_sync(speech: np.ndarray) -> str:
     """
     Transcribe int16 PCM audio at 16kHz to text.
     """
@@ -19,7 +20,7 @@ def transcribe_audio(speech: np.ndarray) -> str:
     rms = np.sqrt(np.mean(audio_float ** 2))
     peak = np.abs(audio_float).max()
     
-    print(f"[STT] Audio stats: RMS={rms:.4f}, Peak={peak:.4f}, Duration={len(speech)/16000:.2f}s")
+    # print(f"[STT] Audio stats: RMS={rms:.4f}, Peak={peak:.4f}, Duration={len(speech)/16000:.2f}s")
     
     # If audio is too quiet, apply gain boost
     if rms < 0.01:
@@ -29,8 +30,8 @@ def transcribe_audio(speech: np.ndarray) -> str:
         print(f"[STT] After gain: RMS={rms:.4f}")
     
     # If still too quiet, there might be a problem with the audio pipeline
-    if rms < 0.005:
-        print(f"[STT] ❌ Audio extremely quiet even after gain. Check microphone/audio source!")
+    # if rms < 0.005:
+    #     print(f"[STT] ❌ Audio extremely quiet even after gain. Check microphone/audio source!")
     
     try:
         segments, info = model.transcribe(
@@ -51,11 +52,11 @@ def transcribe_audio(speech: np.ndarray) -> str:
         
         # Debug logging
         if not text:
-            print(f"[STT] ⚠️  Empty result. Language: {info.language}, prob: {info.language_probability:.2f}")
-            print(f"[STT] This usually means:")
-            print(f"      1. Audio too quiet (check RMS above)")
-            print(f"      2. Audio quality too poor (check downsampling)")
-            print(f"      3. No actual speech in the audio")
+            print(f"[STT] Empty result. Language: {info.language}, prob: {info.language_probability:.2f}")
+            # print(f"[STT] This usually means:")
+            # print(f"      1. Audio too quiet (check RMS above)")
+            # print(f"      2. Audio quality too poor (check downsampling)")
+            # print(f"      3. No actual speech in the audio")
         else:
             print(f"[STT] ✅ Transcribed: \"{text}\"")
         
@@ -67,6 +68,11 @@ def transcribe_audio(speech: np.ndarray) -> str:
         traceback.print_exc()
         return ""
     
+
+
+async def transcribe_audio(speech: np.ndarray) -> str:
+    return await asyncio.to_thread(transcribe_audio_sync, speech)
+
 
 def get_vad_result(chunk, vad: Vad):
     energy = np.abs(chunk).mean()

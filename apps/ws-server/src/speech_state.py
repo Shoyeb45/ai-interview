@@ -9,6 +9,11 @@ class SpeechState:
         self.silence_frames = 0
         self.is_speaking = False
 
+        # Add conversation tracking: Later move to redis
+        self.conversation_history = []
+        self.interview_started = False
+        self.current_question_count = 0
+
     def reset(self):
         self.audio_buffer.clear()
         self.speech_buffer = []
@@ -16,3 +21,11 @@ class SpeechState:
         self.total_speech_frames = 0
         self.silence_frames = 0
         self.is_speaking = False
+
+
+    def add_message(self, role: str, content: str):
+        """Add message to conversation history"""
+        self.conversation_history.append({
+            "role": role,  # "user" or "assistant"
+            "content": content
+        })

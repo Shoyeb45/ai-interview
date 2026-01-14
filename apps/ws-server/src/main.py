@@ -4,14 +4,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import numpy as np
 import webrtcvad
 import asyncio
-from src.audio_bufffer import AudioBuffer, downsample_48k_to_16k, get_mono_audio
-from src.stt import get_vad_result, transcribe_audio
+from src.audio_bufffer import downsample_48k_to_16k, get_mono_audio
+from src.stt import get_vad_result
 from src.websocket_conn import handle_websocket_message
-from src.helper import get_duration, get_token, send_over_ws
+from src.helper import get_token, process_speech_segment, send_over_ws
 from src.constant import FRAME_SIZE, MAX_SPEECH_DURATION, MIN_SPEECH_DURATION, MIN_SPEECH_FRAMES, SILENCE_THRESHOLD
-from src.open_ai_llm import chat_with_openai
 from src.speech_state import SpeechState
-
+from src.interview_agent.software_engineer import start_interview
 app = FastAPI()
 
 active_sessions: dict[str, SpeechState] = {}
@@ -21,42 +20,6 @@ DEBUG_DIR = Path("audio_debug")
 DEBUG_DIR.mkdir(exist_ok=True)
 
 vad = webrtcvad.Vad(2)  # 2 (less aggressive)
-
-def debug_audio_stats(full_speech: np.ndarray):
-    audio_float = full_speech.astype(np.float32) / 32768.0
-    rms = np.sqrt(np.mean(audio_float ** 2))
-    print(f'🔊 Audio RMS: {rms:.4f}, Peak: {np.abs(audio_float).max():.4f}')
-
-
-async def process_speech_segment(ws: WebSocket, speech_buffer, raw_48k_buffer):
-    """Process and transcribe a speech segment"""
-    if not speech_buffer:
-        print('Empty speech buffer')
-        return
-        
-    full_speech = np.concatenate(speech_buffer)
-    duration = get_duration(full_speech)
-    print(f'📊 Speech segment: {duration:.2f}s')
-
-    if duration >= 0.3:
-        debug_audio_stats(full_speech)
-        text = transcribe_audio(full_speech)
-        print(f'User: "{text}"')
-        
-        if text:
-            await send_over_ws(ws, {
-                "type": "transcript",
-                "text": text
-            })
-            # generate llm response
-            # response = chat_with_openai(text)
-            # print(f'OpenAI LLM: "{response}"')
-            # await send_over_ws(ws, {
-            #     "type": "llm_response",
-            #     "response": response
-            # })
-    else:
-        print(f'Audio too short ({duration:.2f}s), skipping')
 
 
 @app.websocket('/ws')
@@ -74,6 +37,17 @@ async def websocket_endpoint(ws: WebSocket):
     state = SpeechState()
     active_sessions[user_id] = state
 
+    opening_message = await start_interview()
+
+    state.add_message('assistant', opening_message)
+    state.interview_started = True
+
+    # Send opening message to user
+    await send_over_ws(ws, {
+        "type": "llm_response",
+        "response": opening_message
+    })
+    
     # Flag to signal track handler to stop
     should_stop = asyncio.Event()
     
@@ -131,7 +105,7 @@ async def websocket_endpoint(ws: WebSocket):
                                 
                                 if state.total_speech_frames >= MAX_SPEECH_DURATION:
                                     print("⏱️  Max duration reached, forcing transcription")
-                                    await process_speech_segment(ws, state.speech_buffer, None)
+                                    await process_speech_segment(ws, state.speech_buffer, state)
                                     state.reset()
                         else:
                             if state.is_speaking:
@@ -140,7 +114,7 @@ async def websocket_endpoint(ws: WebSocket):
                                 
                                 if state.silence_frames > SILENCE_THRESHOLD:
                                     print("🔴 User stopped speaking")
-                                    await process_speech_segment(ws, state.speech_buffer, None)
+                                    await process_speech_segment(ws, state.speech_buffer, state)
                                     state.reset()
                 
                 except asyncio.TimeoutError:

@@ -6,7 +6,9 @@ from fastapi import WebSocket
 import numpy as np
 from src.constant import AUDIO_FREQ
 from urllib.parse import parse_qs, urlparse
-
+from src.stt import transcribe_audio
+from src.speech_state import SpeechState
+from src.interview_agent.software_engineer import get_interviewer_response
 
 def get_duration(speech_buffer):
     '''Returns audio duration in seconds.
@@ -61,3 +63,55 @@ def get_token(url: str):
     parsed_url = urlparse(url)
     token = parse_qs(parsed_url.query)['token'][0]
     return token
+
+
+
+def debug_audio_stats(full_speech: np.ndarray):
+    audio_float = full_speech.astype(np.float32) / 32768.0
+    rms = np.sqrt(np.mean(audio_float ** 2))
+    print(f'🔊 Audio RMS: {rms:.4f}, Peak: {np.abs(audio_float).max():.4f}')
+
+
+
+async def process_speech_segment(ws: WebSocket, speech_buffer, state: SpeechState):
+    """Process and transcribe a speech segment"""
+    if not speech_buffer:
+        print('Empty speech buffer')
+        return
+    
+
+    full_speech = np.concatenate(speech_buffer)
+    duration = get_duration(full_speech)
+    print(f'📊 Speech segment: {duration:.2f}s')
+
+    if duration >= 0.3:
+        # debug_audio_stats(full_speech)
+
+        text = await transcribe_audio(full_speech)
+        print(f'User: "{text}"')
+        
+        if text:
+            await send_over_ws(ws, {
+                "type": "transcript",
+                "text": text,
+                "is_final": True
+            })
+
+            state.add_message('user', text)
+
+            ai_response = await get_interviewer_response(state.conversation_history, state.current_question_count)
+
+            print(f'AI: "{ai_response}"')
+
+            # Add AI response to history
+            state.add_message("assistant", ai_response)
+            state.current_question_count += 1
+
+            # Send to frontend
+            await send_over_ws(ws, {
+                "type": "llm_response",
+                "response": ai_response
+            })
+    else:
+        print(f'Audio too short ({duration:.2f}s), skipping')
+
