@@ -1,6 +1,7 @@
 "use client";
 
 import apiClient, { Tokens } from "@/lib/apiClient";
+import { AxiosError } from "axios";
 import { Brain, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from "react";
@@ -52,7 +53,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       // setError(
       //   err?.response?.data?.message || "Login failed. Please try again."
       // );
-      toast.error(err?.response?.data?.message ?? "Login/Signup failed. Please try again.")
+      let message = "Login/Signup failed. Please try again.";
+
+      if (err instanceof AxiosError) {
+        message = err?.response?.data?.message;
+      }
+      toast.error(message);
     } finally {
       // setIsLoading(false);
     }
