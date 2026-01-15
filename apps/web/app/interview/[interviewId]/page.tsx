@@ -1,0 +1,12 @@
+export default async function page({
+    params
+}:  {
+    params: Promise<{ interviewId : string}>
+}) {
+    
+    const interviewId = (await params).interviewId;
+
+    return (<div>
+        {interviewId}
+    </div>)
+}

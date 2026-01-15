@@ -1,9 +1,9 @@
-import Interview from "@/components/interview";
+import Landing from "@/components/landing";
 
 export default function Home() {
   return (
     <div>
-      <Interview></Interview>
+      <Landing />
     </div>
   );
 }
