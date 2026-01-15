@@ -8,6 +8,7 @@ from av import Packet, frame
 from src.constant import AUDIO_FREQ, ENERGY_THRESHOLD
 from urllib.parse import parse_qs, urlparse
 from webrtcvad import Vad
+import os
 from pydub import AudioSegment
 
 
@@ -159,3 +160,21 @@ def upsample_16k_to_48k(pcm_16k: bytes) -> bytes:
     # Resample to 48kHz
     audio_48k = audio.set_frame_rate(48000)
     return audio_48k.raw_data
+
+
+
+def setup_gcp_cred():
+    cred_path = '/tmp/gcp-creds.json'
+    gcp_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+
+    if gcp_json:
+        # Write the JSON string to a temporary file
+        with open(cred_path, 'w', encoding='utf-8') as f:
+            f.write(gcp_json)
+        
+        # Point the Google SDK to this file for authentication
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cred_path
+        print(f"Credentials saved to {cred_path}")
+    else:
+        print("Warning: GOOGLE_CREDENTIALS_JSON environment variable not found.")
+

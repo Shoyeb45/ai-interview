@@ -1,3 +1,12 @@
+from dotenv import load_dotenv
+from src.core.helper import get_vad_result, get_mono_audio, setup_gcp_cred
+
+
+load_dotenv()
+
+# setup google cloud credentials
+setup_gcp_cred()
+
 from pathlib import Path
 from aiortc import MediaStreamTrack, RTCPeerConnection
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -5,7 +14,6 @@ import numpy as np
 import webrtcvad
 import asyncio
 from src.audio_bufffer import downsample_48k_to_16k
-from src.core.helper import get_vad_result, get_mono_audio
 from src.websocket.websocket_conn import handle_websocket_message
 from src.core.helper import get_token, send_over_ws
 from src.constant import FRAME_SIZE, MAX_SPEECH_DURATION, MIN_SPEECH_DURATION, MIN_SPEECH_FRAMES, SILENCE_THRESHOLD

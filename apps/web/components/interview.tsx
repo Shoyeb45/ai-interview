@@ -2,6 +2,7 @@
 import { useRef, useState, useEffect } from "react";
 import { Mic, MicOff, Volume2 } from "lucide-react";
 import { envVar } from "@/lib/config";
+import { toast } from "sonner";
 
 interface Message {
   role: "user" | "assistant";
@@ -126,6 +127,7 @@ export default function VoiceChat() {
         pc.addTrack(track, stream);
       });
 
+
       pc.ontrack = (event) => {
         console.log(`🔊 Received track: ${event.track.kind}`);
 
@@ -199,6 +201,7 @@ export default function VoiceChat() {
           sdp: offer.sdp,
         }));
       };
+
 
       ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
@@ -281,6 +284,7 @@ export default function VoiceChat() {
       ws.onerror = (error) => {
         console.error("❌ WebSocket error:", error);
         setIsConnected(false);
+        toast.error('Failed to start interview.');
       };
 
       ws.onclose = () => {
@@ -379,7 +383,7 @@ export default function VoiceChat() {
         <div className="bg-white border-b px-6 py-4 shadow-sm">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-800">Voice Chat</h1>
+              <h1 className="text-2xl font-bold text-gray-800">Interview</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {isConnected ? (
                   <span className="flex items-center gap-2">
@@ -400,14 +404,14 @@ export default function VoiceChat() {
                   onClick={initialiseConnection}
                   className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
                 >
-                  Start Chat
+                  Start Interview
                 </button>
               ) : (
                 <button
                   onClick={disconnect}
                   className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium"
                 >
-                  End Chat
+                  End Interview
                 </button>
               )}
             </div>
@@ -448,7 +452,7 @@ export default function VoiceChat() {
                     }`}
                   >
                     <p className="text-sm font-medium mb-1 opacity-70">
-                      {message.role === "user" ? "You" : "Assistant"}
+                      {message.role === "user" ? "You" : "Interviewer"}
                     </p>
                     <p className="whitespace-pre-wrap">{message.content}</p>
                     <p
