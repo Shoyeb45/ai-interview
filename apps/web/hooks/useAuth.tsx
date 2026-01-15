@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/apiClient';
+import { toast } from 'sonner';
 
 export type User = {
   id: number;
@@ -29,13 +30,14 @@ export const useAuth = () => {
       if (!token) {
         setUser(null);
         setLoading(false);
+        toast.error('Please login again.');
         return;
       }
-
+      
       try {
         const currentUser = await fetchCurrentUser();
         localStorage.setItem('user', JSON.stringify(currentUser));
-
+        
         if (currentUser) {
           setUser(currentUser);
         } else {
@@ -45,6 +47,7 @@ export const useAuth = () => {
           setUser(null);
         }
       } catch (err) {
+        toast.error('Please login again.');
         console.error('Auth check failed', err);
         setUser(null);
       } finally {

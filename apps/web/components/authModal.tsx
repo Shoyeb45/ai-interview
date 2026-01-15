@@ -4,6 +4,7 @@ import apiClient, { Tokens } from "@/lib/apiClient";
 import { Brain, X } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -51,6 +52,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       // setError(
       //   err?.response?.data?.message || "Login failed. Please try again."
       // );
+      toast.error(err?.response?.data?.message ?? "Login/Signup failed. Please try again.")
     } finally {
       // setIsLoading(false);
     }
