@@ -19,8 +19,10 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  roles     UserRoleRelation[]
-  keystores Keystore[]
+  roles            UserRoleRelation[]
+  keystores        Keystore[]
+  interviews       Interview[]
+  interviewResults InterviewResult[]
 
   @@index([email])
 }
@@ -97,4 +99,270 @@ model ApiKey {
 
 enum Permission {
   GENERAL
+}
+
+
+// ============================================
+// INTERVIEW SYSTEM
+// ============================================
+
+model Interview {
+  id     Int    @id @default(autoincrement())
+  userId Int    @map("user_id")
+  title  String // e.g., "Backend Developer Interview"
+
+  // Interview Configuration
+  role            String // e.g., "Software Engineer", "Data Scientist"
+  jobDescription  String @map("job_description") @db.Text
+  experienceLevel ExperienceLevel @map("experience_level")
+  
+  // Interview Settings
+  totalQuestions     Int     @default(6) @map("total_questions")
+  estimatedDuration  Int     @default(30) @map("estimated_duration") // minutes
+  focusAreas         String[] @map("focus_areas") // ["algorithms", "system design", "coding"]
+  
+  // Status
+  status        InterviewStatus @default(SCHEDULED)
+  scheduledFor  DateTime?       @map("scheduled_for")
+  startedAt     DateTime?       @map("started_at")
+  completedAt   DateTime?       @map("completed_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations    Conversation[]
+  result           InterviewResult?
+  
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+}
+
+enum ExperienceLevel {
+  INTERN
+  ENTRY_LEVEL
+  JUNIOR
+  MID_LEVEL
+  SENIOR
+  LEAD
+  PRINCIPAL
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  PAUSED
+}
+
+// ============================================
+// CONVERSATION & MESSAGES
+// ============================================
+
+model Conversation {
+  id          Int    @id @default(autoincrement())
+  interviewId Int    @map("interview_id")
+  
+  // Question Details
+  questionNumber Int    @map("question_number")
+  question       String @db.Text
+  category       String? // "technical", "behavioral", "coding"
+  difficulty     DifficultyLevel?
+  
+  // Answer Details
+  answer         String? @db.Text
+  
+  // Timing Metrics
+  questionAskedAt DateTime  @map("question_asked_at")
+  answerStartedAt DateTime? @map("answer_started_at")
+  answerEndedAt   DateTime? @map("answer_ended_at")
+  thinkingTime    Int?      @map("thinking_time") // seconds
+  answerDuration  Int?      @map("answer_duration") // seconds
+  
+  // Performance Indicators
+  strugglingIndicators Int @default(0) @map("struggling_indicators")
+  confidenceScore      Float? @map("confidence_score") // 0-1
+  clarificationsAsked  Int @default(0) @map("clarifications_asked")
+  hintsProvided        Int @default(0) @map("hints_provided")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  feedback  QuestionFeedback?
+  
+  @@index([interviewId])
+  @@index([interviewId, questionNumber])
+}
+
+enum DifficultyLevel {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  conversationId Int      @map("conversation_id")
+  
+  role      MessageRole
+  content   String      @db.Text
+  timestamp DateTime    @default(now())
+  
+  // Speech metrics (for voice interviews)
+  audioUrl      String? @map("audio_url")
+  duration      Float? // seconds
+  wordsPerMin   Float?  @map("words_per_min")
+  pauseCount    Int     @default(0) @map("pause_count")
+  fillerWords   Int     @default(0) @map("filler_words") // um, uh, like
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId])
+  @@index([conversationId, timestamp])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ============================================
+// FEEDBACK SYSTEM
+// ============================================
+
+model QuestionFeedback {
+  id             Int @id @default(autoincrement())
+  conversationId Int @unique @map("conversation_id")
+  
+  // Question-specific feedback
+  answerQuality       Int    @map("answer_quality") // 1-10
+  technicalAccuracy   Int    @map("technical_accuracy") // 1-10
+  communicationClarity Int   @map("communication_clarity") // 1-10
+  problemSolvingSkill Int    @map("problem_solving_skill") // 1-10
+  
+  // Detailed feedback
+  strengths           String[] // ["Clear explanation", "Good structure"]
+  weaknesses          String[] // ["Missed edge cases", "Too verbose"]
+  suggestions         String[] // ["Consider mentioning X", "Improve Y"]
+  
+  // AI Assessment
+  expectedKeywords    String[] @map("expected_keywords")
+  mentionedKeywords   String[] @map("mentioned_keywords")
+  missedKeywords      String[] @map("missed_keywords")
+  
+  feedback            String   @db.Text // Detailed AI feedback
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId])
+}
+
+model InterviewResult {
+  id          Int @id @default(autoincrement())
+  interviewId Int @unique @map("interview_id")
+  userId      Int @map("user_id")
+  
+  // Overall Scores (0-100)
+  overallScore         Int    @map("overall_score")
+  technicalScore       Int    @map("technical_score")
+  communicationScore   Int    @map("communication_score")
+  problemSolvingScore  Int    @map("problem_solving_score")
+  cultureFitScore      Int    @map("culture_fit_score")
+  
+  // Skill-based Evaluation
+  skillScores          Json   @map("skill_scores") 
+  // { "algorithms": 85, "system_design": 70, "databases": 90 }
+  
+  // Summary
+  topStrengths         String[] @map("top_strengths")
+  topWeaknesses        String[] @map("top_weaknesses")
+  
+  // Decision
+  decision             HiringDecision
+  roleReadinessPercent Int    @map("role_readiness_percent") // 0-100
+  
+  // Improvement Plan
+  improvementPlan      Json   @map("improvement_plan")
+  // {
+  //   "day1-2": ["Study topic X", "Practice Y"],
+  //   "day3-4": ["Build project Z"],
+  //   ...
+  // }
+  
+  // Detailed Analysis
+  detailedFeedback     String @map("detailed_feedback") @db.Text
+  transcriptSummary    String @map("transcript_summary") @db.Text
+  
+  // Metrics
+  totalQuestions       Int    @map("total_questions")
+  questionsAnswered    Int    @map("questions_answered")
+  avgResponseTime      Float  @map("avg_response_time") // seconds
+  avgConfidence        Float  @map("avg_confidence")
+  totalHintsUsed       Int    @map("total_hints_used")
+  interviewDuration    Int    @map("interview_duration") // minutes
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([interviewId])
+  @@index([decision])
+}
+
+enum HiringDecision {
+  STRONG_HIRE
+  HIRE
+  BORDERLINE
+  NO_HIRE
+  STRONG_NO_HIRE
+}
+
+// ============================================
+// ANALYTICS & METRICS
+// ============================================
+
+model UserMetrics {
+  id     Int @id @default(autoincrement())
+  userId Int @unique @map("user_id")
+  
+  // Overall Stats
+  totalInterviews        Int   @default(0) @map("total_interviews")
+  completedInterviews    Int   @default(0) @map("completed_interviews")
+  averageScore           Float @default(0) @map("average_score")
+  
+  // Performance Trends
+  scoreHistory           Json  @map("score_history") 
+  // [{"date": "2024-01-01", "score": 75}, ...]
+  
+  skillProgress          Json  @map("skill_progress")
+  // {"algorithms": [60, 65, 70], "system_design": [50, 60, 65]}
+  
+  // Time Stats
+  totalPracticeTime      Int   @default(0) @map("total_practice_time") // minutes
+  avgInterviewDuration   Float @default(0) @map("avg_interview_duration")
+  
+  // Achievements
+  strongestSkills        String[] @map("strongest_skills")
+  improvingSkills        String[] @map("improving_skills")
+  needsWorkSkills        String[] @map("needs_work_skills")
+  
+  lastInterviewDate      DateTime? @map("last_interview_date")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  @@index([userId])
 }
