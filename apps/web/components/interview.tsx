@@ -59,7 +59,21 @@ export default function VoiceChat() {
     }
   };
 
-  // Monitor audio playback to detect when AI actually finishes speaking
+  // Clear AI speaking state and unmute
+  const clearAISpeaking = () => {
+    console.log("✅ Clearing AI speaking state");
+    
+    // Clear any existing timeout
+    if (aiSpeakingTimeoutRef.current) {
+      clearTimeout(aiSpeakingTimeoutRef.current);
+      aiSpeakingTimeoutRef.current = null;
+    }
+    
+    setIsAISpeaking(false);
+    unmuteMicrophone();
+  };
+
+  // Monitor audio playback
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -70,37 +84,48 @@ export default function VoiceChat() {
       muteMicrophone();
     };
 
+    const handleEnded = () => {
+      console.log("✅ AI finished speaking (audio ended)");
+      clearAISpeaking();
+    };
+
     const handlePause = () => {
-      console.log("⏸️ Audio paused");
-      // Only unmute if audio is truly finished, not just paused
-      if (audio.ended) {
-        setIsAISpeaking(false);
-        unmuteMicrophone();
+      // Only consider it "ended" if the audio has actually finished
+      // This prevents premature unmuting during brief pauses
+      if (audio.ended || audio.currentTime === audio.duration) {
+        console.log("✅ Audio paused at end");
+        clearAISpeaking();
+      } else {
+        console.log("⏸️ Audio paused (not ended, duration:", audio.duration, "current:", audio.currentTime, ")");
       }
     };
 
-    const handleEnded = () => {
-      console.log("✅ AI finished speaking (audio ended)");
-      setIsAISpeaking(false);
-      unmuteMicrophone();
+    const handleTimeUpdate = () => {
+      // Check if we're near the end (within 100ms)
+      if (audio.duration > 0 && audio.duration - audio.currentTime < 0.1) {
+        console.log("✅ Audio near end, preparing to unmute");
+      }
     };
 
     const handleError = (e: Event) => {
       console.error("❌ Audio error:", e);
+      clearAISpeaking();
     };
 
     audio.addEventListener("play", handlePlay);
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("error", handleError);
 
     return () => {
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("error", handleError);
     };
-  });
+  }, []);
 
   const initialiseConnection = async () => {
     try {
@@ -126,7 +151,6 @@ export default function VoiceChat() {
       stream.getTracks().forEach((track) => {
         pc.addTrack(track, stream);
       });
-
 
       pc.ontrack = (event) => {
         console.log(`🔊 Received track: ${event.track.kind}`);
@@ -167,7 +191,6 @@ export default function VoiceChat() {
               })
               .catch((err) => {
                 console.log(`⚠️ Autoplay blocked: ${err.message}`);
-                // Set up click handler to start audio
                 const playOnClick = () => {
                   audioRef.current?.play()
                     .then(() => console.log("✅ Audio started after user interaction"))
@@ -192,7 +215,6 @@ export default function VoiceChat() {
         setIsConnected(true);
         setIsListening(true);
 
-        // Create and send offer
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         
@@ -201,7 +223,6 @@ export default function VoiceChat() {
           sdp: offer.sdp,
         }));
       };
-
 
       ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
@@ -228,12 +249,10 @@ export default function VoiceChat() {
         }
 
         if (data.type === "ai_status") {
-          // AI is thinking - keep mic muted
           muteMicrophone();
         }
 
         if (data.type === "llm_response") {
-          // Clear any "thinking" messages
           setMessages((prev) => prev.filter((m) => m.content !== "💭 Thinking..."));
           addMessage("assistant", data.response);
 
@@ -246,18 +265,17 @@ export default function VoiceChat() {
           muteMicrophone();
           setIsAISpeaking(true);
 
-          // Backup timeout in case audio events don't fire
-          // Calculate based on text length (more conservative estimate)
-          const wordCount = data.response.split(/\s+/).length;
-          const estimatedDuration = Math.max((wordCount / 2) * 1000, 3000); // At least 3 seconds
+          // MUCH SHORTER backup timeout - just a safety net
+          // Most responses will finish within 10 seconds
+          // The audio 'ended' event should fire first in 99% of cases
+          const BACKUP_TIMEOUT = 10000; // 10 seconds max
           
-          console.log(`📊 Estimated AI speaking time: ${(estimatedDuration / 1000).toFixed(1)}s (${wordCount} words)`);
+          console.log(`⏰ Setting backup timeout: ${BACKUP_TIMEOUT}ms`);
 
           aiSpeakingTimeoutRef.current = setTimeout(() => {
-            console.log("⏰ Backup timeout - unmuting microphone");
-            setIsAISpeaking(false);
-            unmuteMicrophone();
-          }, estimatedDuration + 2000);
+            console.log("⏰ BACKUP TIMEOUT - force unmuting (audio events may have failed)");
+            clearAISpeaking();
+          }, BACKUP_TIMEOUT);
         }
 
         if (data.type === "interviewer_tip") {
@@ -266,13 +284,15 @@ export default function VoiceChat() {
 
         if (data.type === "user_speaking") {
           if (data.speaking) {
-            console.log("🗣️ User started speaking");
-            // Ensure AI audio is stopped when user starts speaking
+            console.log("🗣️ User started speaking - interrupting AI");
+            
+            // Stop AI audio immediately
             if (audioRef.current && !audioRef.current.paused) {
               audioRef.current.pause();
+              audioRef.current.currentTime = 0;
             }
-            setIsAISpeaking(false);
-            unmuteMicrophone();
+            
+            clearAISpeaking();
           }
         }
 
@@ -320,36 +340,30 @@ export default function VoiceChat() {
   const disconnect = () => {
     console.log("🔌 Disconnecting...");
 
-    // Clear timeout
     if (aiSpeakingTimeoutRef.current) {
       clearTimeout(aiSpeakingTimeoutRef.current);
     }
 
-    // Close peer connection
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
     }
 
-    // Close WebSocket
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
 
-    // Stop audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.srcObject = null;
     }
 
-    // Stop remote stream
     if (remoteStreamRef.current) {
       remoteStreamRef.current.getTracks().forEach((track) => track.stop());
       remoteStreamRef.current = null;
     }
 
-    // Close audio context
     if (audioContextRef.current) {
       audioContextRef.current.close();
       audioContextRef.current = null;
@@ -430,7 +444,7 @@ export default function VoiceChat() {
                   Start speaking to begin the conversation
                 </p>
                 <p className="text-gray-400 text-sm mt-2">
-                  Click &quot;Start Chat&quot; and allow microphone access
+                  Click &quot;Start Interview&quot; and allow microphone access
                 </p>
                 <p className="text-gray-400 text-xs mt-4 max-w-md mx-auto">
                   💡 The microphone will automatically mute when the AI is speaking to prevent echo
