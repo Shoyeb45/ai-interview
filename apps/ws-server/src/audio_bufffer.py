@@ -30,54 +30,10 @@ def downsample_48k_to_16k(pcm_48k: np.ndarray) -> np.ndarray:
     if len(pcm_48k) == 0:
         return np.array([], dtype=np.int16)
     
-    # METHOD 1: scipy resample_poly (what we're using now)
+    # scipy resample_poly (what we're using now)
     downsampled = signal.resample_poly(pcm_48k, 1, 3)
     downsampled = np.clip(downsampled, -32768, 32767)
     result = downsampled.astype(np.int16)
-    
-    # Save comparison on first call for debugging
-    if not hasattr(downsample_48k_to_16k, '_saved_comparison'):
-        try:
-            from pathlib import Path
-            import wave
-            
-            debug_dir = Path("audio_debug")
-            debug_dir.mkdir(exist_ok=True)
-            
-            # Save original 48k
-            path_48k = debug_dir / "DOWNSAMPLE_TEST_original_48k.wav"
-            with wave.open(str(path_48k), 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(48000)
-                wf.writeframes(pcm_48k[:48000].tobytes())  # First 1 second
-            
-            # Save scipy downsampled 16k
-            path_16k_scipy = debug_dir / "DOWNSAMPLE_TEST_scipy_16k.wav"
-            with wave.open(str(path_16k_scipy), 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(16000)
-                wf.writeframes(result[:16000].tobytes())
-            
-            # Try simple decimation for comparison
-            simple_decimate = pcm_48k[::3][:16000]
-            path_16k_simple = debug_dir / "DOWNSAMPLE_TEST_simple_16k.wav"
-            with wave.open(str(path_16k_simple), 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(16000)
-                wf.writeframes(simple_decimate.tobytes())
-            
-            print(f"🧪 Saved downsampling comparison files:")
-            print(f"   1. {path_48k.name} (original)")
-            print(f"   2. {path_16k_scipy.name} (scipy method)")
-            print(f"   3. {path_16k_simple.name} (simple decimation)")
-            print(f"   👉 Listen to all three and compare!")
-            
-            downsample_48k_to_16k._saved_comparison = True
-        except Exception as e:
-            print(f"Warning: Could not save downsampling test: {e}")
     
     return result
 

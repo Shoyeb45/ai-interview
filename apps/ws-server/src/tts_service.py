@@ -1,8 +1,6 @@
 import asyncio
-import io
 import numpy as np
 from google.cloud import texttospeech
-from pydub import AudioSegment
 
 class TTSService:
     """Google Cloud Text-to-Speech service"""

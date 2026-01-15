@@ -59,7 +59,7 @@ class InterviewMetrics:
         word_count = len(text.split())
         
         # Struggling indicators
-        struggling_words = ['um', 'uh', 'hmm', 'err', 'like', 'you know']
+        struggling_words = ['um', 'uh', 'hmm', 'err', 'like', 'you know', 'ahh']
         struggle_count = sum(1 for word in struggling_words if word in text.lower())
         
         analysis = {
@@ -96,7 +96,7 @@ async def provide_encouragement(pause_duration: float) -> str:
 async def start_interview() -> str:
     """Generate opening message"""
     return """Hello! Thanks for joining today. I'll be conducting your interview for the Software Engineer position.
-"""
-# This will be a conversational interview with about 5-6 questions covering your technical skills and problem-solving approach. Feel free to think out loud, ask for clarification, or request hints if you need them.
 
-# Ready to begin? Let's start with: Can you tell me about a challenging technical problem you've solved recently and how you approached it?"""
+This will be a conversational interview with about 5-6 questions covering your technical skills and problem-solving approach. Feel free to think out loud, ask for clarification, or request hints if you need them.
+
+Ready to begin? Let's start with: Can you tell me about a challenging technical problem you've solved recently and how you approached it?"""
