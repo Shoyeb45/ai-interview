@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Target,
   Zap,
@@ -10,10 +10,16 @@ import {
   Sparkles,
 } from "lucide-react";
 import AuthModal from "./authModal";
+import axios from "axios";
+import { envVar } from "@/lib/config";
+import apiClient from "@/lib/apiClient";
 
 export default function Landing() {
   const [showAuthModal, setShowAuthModal] = useState(false);
-
+  useEffect(() => {
+    apiClient.get('/health');
+  }, []);
+  
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
