@@ -1,4 +1,4 @@
-import { AuthFailureError, InternalError } from './ApiError';
+import { AuthFailureError, InternalError, NotFoundError } from './ApiError';
 import { ProtectedRequest, Tokens } from './../types/app-requests';
 import JWT, { JwtPayload } from './jwtUtils';
 import { tokenInfo } from './../config';
@@ -16,7 +16,7 @@ export const getAccessToken = (req: ProtectedRequest) => {
         return cookieToken;
     }
 
-    throw new AuthFailureError('Access token missing');
+    throw new NotFoundError('Access token missing');
 };
 
 export const getRefreshToken = (req: ProtectedRequest) => {
@@ -27,7 +27,7 @@ export const getRefreshToken = (req: ProtectedRequest) => {
     if (req.cookies?.refreshToken) {
         return req.cookies.refreshToken;
     }
-    throw new AuthFailureError('Refresh Token is missing.');
+    throw new NotFoundError('Refresh Token is missing.');
 }
 export const validateTokenData = (payload: JwtPayload): boolean => {
     if (

@@ -1,4 +1,4 @@
-from src.audio_bufffer import AudioBuffer
+from src.websocket.audio_bufffer import AudioBuffer
 
 class SpeechState:
     def __init__(self):
