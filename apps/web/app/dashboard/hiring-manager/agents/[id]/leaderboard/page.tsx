@@ -1,82 +1,45 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trophy, Users, ChevronRight } from "lucide-react";
-import { getInterviewAgentById, getSessionsByAgentId } from "@/lib/mockApi";
-import type { InterviewAgent, CandidateInterviewSession } from "@/types/schema";
+import { getInterviewAgentById } from "@/lib/mockApi";
+import apiClient from "@/lib/apiClient";
+import type { InterviewAgent } from "@/types/schema";
 import { getDecisionColor } from "@/lib/getDecisionColor";
 
-type LeaderboardRow = {
+interface LeaderboardEntry {
+  rank: number;
   candidateId: number;
-  name: string;
-  email: string;
-  attempts: number;
+  candidateName: string;
+  candidateEmail: string;
+  totalAttempts: number;
   completedAttempts: number;
   bestScore: number;
-  latestDecision: string | null;
-  latestCompletedAt: string | null;
-};
-
-function buildLeaderboard(sessions: CandidateInterviewSession[]): LeaderboardRow[] {
-  const byCandidate = new Map<
-    number,
-    { name: string; email: string; sessions: CandidateInterviewSession[] }
-  >();
-  for (const s of sessions) {
-    const c = s.candidate;
-    const name = c?.name ?? `Candidate ${s.candidateId}`;
-    const email = c?.email ?? "";
-    if (!byCandidate.has(s.candidateId)) {
-      byCandidate.set(s.candidateId, { name, email, sessions: [] });
-    }
-    byCandidate.get(s.candidateId)!.sessions.push(s);
-  }
-  const rows: LeaderboardRow[] = [];
-  for (const [candidateId, { name, email, sessions }] of byCandidate) {
-    const withResult = sessions.filter((s) => s.overallResult != null);
-    const bestScore =
-      withResult.length > 0
-        ? Math.max(...withResult.map((s) => s.overallResult!.overallScore))
-        : 0;
-    const latest = withResult.sort(
-      (a, b) =>
-        new Date((b.completedAt ?? b.updatedAt) ?? 0).getTime() -
-        new Date((a.completedAt ?? a.updatedAt) ?? 0).getTime()
-    )[0];
-    rows.push({
-      candidateId,
-      name,
-      email,
-      attempts: sessions.length,
-      completedAttempts: withResult.length,
-      bestScore,
-      latestDecision: latest?.overallResult?.decision ?? null,
-      latestCompletedAt: latest?.completedAt ?? null,
-    });
-  }
-  rows.sort((a, b) => b.bestScore - a.bestScore);
-  return rows;
+  latestDecision: string;
+  lastCompletedAt: string | null;
 }
 
 export default function LeaderboardPage() {
   const params = useParams();
   const id = Number(params.id);
   const [agent, setAgent] = useState<InterviewAgent | null>(null);
-  const [sessions, setSessions] = useState<CandidateInterviewSession[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!id || isNaN(id)) return;
     setLoading(true);
     try {
-      const [agentData, sessionsData] = await Promise.all([
+      const [agentData, leaderboardData] = await Promise.all([
         getInterviewAgentById(id),
-        getSessionsByAgentId(id),
+        apiClient.get<LeaderboardEntry[]>(`/interview-result/leaderboard/${id}`),
       ]);
       setAgent(agentData ?? null);
-      setSessions(sessionsData);
+      setLeaderboard(Array.isArray(leaderboardData) ? leaderboardData : []);
+    } catch {
+      setLeaderboard([]);
     } finally {
       setLoading(false);
     }
@@ -85,8 +48,6 @@ export default function LeaderboardPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-  const leaderboard = useMemo(() => buildLeaderboard(sessions), [sessions]);
 
   if (loading) {
     return (
@@ -157,14 +118,14 @@ export default function LeaderboardPage() {
                   className="border-b border-gray-100 hover:bg-gray-50/50"
                 >
                   <td className="py-3 px-4 font-bold text-gray-900">
-                    {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : index + 1}
+                    {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : row.rank}
                   </td>
                   <td className="py-3 px-4">
-                    <div className="font-medium text-gray-900">{row.name}</div>
-                    <div className="text-sm text-gray-500">{row.email}</div>
+                    <div className="font-medium text-gray-900">{row.candidateName}</div>
+                    <div className="text-sm text-gray-500">{row.candidateEmail}</div>
                   </td>
                   <td className="py-3 px-4 text-center text-gray-700">
-                    {row.completedAttempts} / {row.attempts}
+                    {row.completedAttempts} / {row.totalAttempts}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className="font-semibold text-gray-900">{row.bestScore}%</span>
@@ -183,8 +144,8 @@ export default function LeaderboardPage() {
                     )}
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-600">
-                    {row.latestCompletedAt
-                      ? new Date(row.latestCompletedAt).toLocaleDateString()
+                    {row.lastCompletedAt
+                      ? new Date(row.lastCompletedAt).toLocaleDateString()
                       : "—"}
                   </td>
                   <td className="py-3 px-4 text-right">

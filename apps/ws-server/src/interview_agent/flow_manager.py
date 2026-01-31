@@ -158,6 +158,7 @@ Output format: End your response with exactly [NEXT] ONLY when moving to the nex
                 current_context = f"Question {self.current_question_index} (from focus areas)"
 
         # Next question - what to ask when we advance (or closing if last)
+        next_question_text: Optional[str] = None
         next_index = self.current_question_index
         if next_index >= self.total_questions - 1 and self.current_question_index > 0:
             # Advancing from last question - give closing, not next question

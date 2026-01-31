@@ -12,7 +12,7 @@ router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/interview-agent', interviewAgentRoutes);
 router.use('/user', userRoutes);
-router.use('interview-result', interviewResultRoutes);
+router.use('/interview-result', interviewResultRoutes);
 router.use('/interview', interviewRoutes);
 
 export default router;
