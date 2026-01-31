@@ -72,38 +72,10 @@ class RedisClient {
         return await this.redis.get(key);
     }
 
-    public async setTestcase(problemId: string, value: string) {
-        await this.redis.set(problemId, value, 'EX', 4 * 60 * 60);
+    // 20 minutes
+    public async setSession(sessionId: string, value: string) {
+        await this.redis.set(sessionId, value, 'EX', 20 * 60);
     }
-
-    // public async addTestcase(problmeId: string, testcase: TestcaseData[]) {
-    //     const value = await this.getResult(problmeId);
-    //     if (value === null) {
-    //         logger.info('Testcases are not cached in redis.');
-    //         return;
-    //     }
-
-    //     const data: TestcaseData[] = JSON.parse(value);
-    //     data.push(...testcase);
-    //     await this.setTestcase(problmeId, JSON.stringify(data));
-    // }
-
-    // public async deleteTestcase(problemId: string, testcaseId: string) {
-    //     const value = await this.getResult(problemId);
-
-    //     if (value === null) {
-    //         // await this.redis.del(problemId);
-    //         logger.info('Testcases are not cached in redis.');
-    //         return;
-    //     }
-
-    //     const testcaseData: TestcaseData[] = JSON.parse(value);
-
-    //     await this.setTestcase(
-    //         problemId,
-    //         JSON.stringify(testcaseData.filter(tc => tc.id !== testcaseId)),
-    //     );
-    // }
 
     /**
      * Redis Health check

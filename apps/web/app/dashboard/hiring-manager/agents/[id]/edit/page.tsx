@@ -196,7 +196,8 @@ export default function EditAgentPage() {
       };
       await apiClient.patch<unknown, InterviewAgentPatchBody>(`/interview-agent/${id}`, body);
       toast.success("Interview agent updated");
-      router.push(`/dashboard/hiring-manager/agents/${id}`);
+      // router.push(`/dashboard/hiring-manager/agents/${id}`);
+      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update agent";
       toast.error(message);

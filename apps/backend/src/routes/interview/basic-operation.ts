@@ -10,6 +10,7 @@ import { RoleCode } from "@prisma/client";
 import { SuccessResponse } from "../../core/ApiResponse";
 import interviewAgentRepo from "../../database/repositories/interview-agent.repo";
 import { BadRequestError } from "../../core/ApiError";
+import redis from "../../service/redis";
 
 const router = Router();
 
@@ -17,6 +18,9 @@ async function canGiveInterview(agentId: number, userId: number) {
     const limits = await interviewAgentRepo.getInterviewAgentLimits(agentId, userId);
     if (!limits)
         throw new BadRequestError('Invalid Interview Agent ID.');
+
+    if (!limits.canUserAttempt)
+        throw new BadRequestError('You have reached the maximum number of attempts for this interview.');
 
     if (!limits.canAcceptNewCandidates)
         throw new BadRequestError('Max Candidate limit reached.');
@@ -32,6 +36,8 @@ router.post(
         await canGiveInterview(interviewAgentId, req.user.id);
         const ids = await interviewRepo.initiateInterview(interviewAgentId, req.user.id);
 
+        // Store interview agent details in Redis before returning (required for WS connection)
+        await redis.getAndStoreSessionDetails(interviewAgentId, req.user.id, ids.sessionId, ids.interviewId);
         new SuccessResponse('Session created.', ids).send(res);
     })
 );

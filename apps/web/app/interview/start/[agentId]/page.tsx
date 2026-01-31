@@ -125,6 +125,8 @@ export default function InterviewStartPage() {
         estimatedDuration: agent.estimatedDuration,
         focusAreas: agent.focusAreas ?? [],
         experienceLevel: agent.experienceLevel,
+        sessionId: result.sessionId,
+        interviewId: result.interviewId
       };
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem(

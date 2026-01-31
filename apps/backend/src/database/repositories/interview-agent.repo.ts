@@ -338,29 +338,36 @@ const update = async (
 
         // Handle questions when payload includes questions (array may be empty = remove all)
         if (data.questions !== undefined) {
+            // delete all the questions
+            await tx.interviewQuestion.deleteMany({
+                where: {
+                    interviewAgentId
+                }
+            });
+
             const questionUpdates: Promise<unknown>[] = [];
-            const questionIdsInUpdate: number[] = [];
+            // const questionIdsInUpdate: number[] = [];
 
             data.questions.forEach((question) => {
-                if (question.questionId) {
-                    // Track existing question IDs
-                    questionIdsInUpdate.push(question.questionId);
+                // if (question.questionId) {
+                //     // Track existing question IDs
+                //     questionIdsInUpdate.push(question.questionId);
 
-                    // Update existing question
-                    questionUpdates.push(
-                        tx.interviewQuestion.update({
-                            where: {
-                                id: question.questionId,
-                            },
-                            data: {
-                                ..._.omitBy(
-                                    _.omit(question, ['questionId']),
-                                    _.isNil,
-                                ),
-                            },
-                        }),
-                    );
-                } else {
+                //     // Update existing question
+                //     questionUpdates.push(
+                //         tx.interviewQuestion.update({
+                //             where: {
+                //                 id: question.questionId,
+                //             },
+                //             data: {
+                //                 ..._.omitBy(
+                //                     _.omit(question, ['questionId']),
+                //                     _.isNil,
+                //                 ),
+                //             },
+                //         }),
+                //     );
+                // } else {
                     // Create new question (no questionId means it's new)
                     questionUpdates.push(
                         tx.interviewQuestion.create({
@@ -378,20 +385,20 @@ const update = async (
                             },
                         }),
                     );
-                }
+                // }
             });
 
-            // Delete questions that were removed from the list (exist in DB but not in payload)
-            questionUpdates.push(
-                tx.interviewQuestion.deleteMany({
-                    where: {
-                        interviewAgentId,
-                        ...(questionIdsInUpdate.length > 0
-                            ? { id: { notIn: questionIdsInUpdate } }
-                            : {}),
-                    },
-                }),
-            );
+            // // Delete questions that were removed from the list (exist in DB but not in payload)
+            // questionUpdates.push(
+            //     tx.interviewQuestion.deleteMany({
+            //         where: {
+            //             interviewAgentId,
+            //             ...(questionIdsInUpdate.length > 0
+            //                 ? { id: { notIn: questionIdsInUpdate } }
+            //                 : {}),
+            //         },
+            //     }),
+            // );
 
             await Promise.all(questionUpdates);
         }

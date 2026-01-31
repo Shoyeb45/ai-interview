@@ -18,26 +18,25 @@ client = AsyncAzureOpenAI(
 
 async def get_interviewer_response(
     conversation_history: list,
-    current_question_count: int,
-    SYSTEM_PROMPT: str,
+    system_prompt: str,
     metrics: InterviewMetrics = None,
     context: dict = None
 ) -> str:
     """
-    Get GPT response with natural interview behavior
-    
+    Get GPT response with natural interview behavior.
+
     Args:
         conversation_history: Full conversation so far
-        current_question_count: Which question we're on
+        system_prompt: Full system prompt (dynamic from flow manager)
         metrics: Performance tracking
-        context: Additional context like pause duration, answer analysis
+        context: Additional context (long_pause, answer_analysis, question_instruction)
     """
-    
-    # Build system prompt
-    system_msg = SYSTEM_PROMPT.format(
-        current_question=current_question_count + 1
-    )
-    
+    system_msg = system_prompt
+
+    # Add question instruction for AI-generated questions (AI_ONLY, MIXED)
+    if context and context.get("question_instruction"):
+        system_msg += f"\n\nNext question instruction: {context['question_instruction']}"
+
     # Add context about user's behavior if available
     if context:
         behavior_note = "\n\nCandidate behavior context:\n"

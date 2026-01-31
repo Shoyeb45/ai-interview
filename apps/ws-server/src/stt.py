@@ -5,7 +5,7 @@ import time
 from fastapi import WebSocket
 from src.speech_state import SpeechState
 from src.interview_agent.ai_brain import get_interviewer_response
-from src.interview_agent.software_engineer import SYSTEM_PROMPT, InterviewMetrics, provide_encouragement
+from src.interview_agent.software_engineer import InterviewMetrics, provide_encouragement
 from src.websocket.webrtc_tts_track import TTSAudioTrack
 from src.tts_service import tts_service
 from src.core.helper import send_over_ws
@@ -69,11 +69,12 @@ async def transcribe_audio(speech: np.ndarray) -> str:
 
 class StreamingSpeechProcessor:
     """Non-blocking speech processor with interrupt handling"""
-    def __init__(self, ws: WebSocket, state: SpeechState, metrics: InterviewMetrics, tts_track: TTSAudioTrack = None):
+    def __init__(self, ws: WebSocket, state: SpeechState, metrics: InterviewMetrics, tts_track: TTSAudioTrack = None, flow_manager=None):
         self.ws = ws
         self.state = state
         self.metrics = metrics
         self.tts_track = tts_track
+        self.flow_manager = flow_manager
         self.processing_queue = asyncio.Queue()
         self.is_processing = False
         self.last_activity_time = time.time()
@@ -181,37 +182,53 @@ class StreamingSpeechProcessor:
             asyncio.create_task(self._generate_response(text, context))
             
     async def _generate_response(self, user_text: str, context: dict):
-        """Generate AI response"""
+        """Generate AI response - uses flow_manager for dynamic questions (provided or LLM-generated)."""
         try:
+            if not self.flow_manager:
+                print("❌ No flow manager - cannot generate response")
+                return
+
+            if self.flow_manager.is_interview_complete():
+                print("[CHECKPOINT] Interview complete - wrapping up")
+                # Could send a closing message - for now, still try to get next (will return None)
+                pass
+
             await send_over_ws(self.ws, {
                 "type": "ai_status",
                 "status": "thinking"
             })
-            
-            ai_response = await get_interviewer_response(
-                self.state.conversation_history,
-                self.state.current_question_count,
-                SYSTEM_PROMPT,
-                self.metrics,
-                context
+
+            predefined_question, system_prompt, llm_context = self.flow_manager.get_next_question(
+                previous_answer=user_text,
+                context=context,
             )
-            
+
+            if predefined_question:
+                ai_response = predefined_question
+            else:
+                merged_context = {**context, **llm_context}
+                ai_response = await get_interviewer_response(
+                    self.state.conversation_history,
+                    system_prompt,
+                    self.metrics,
+                    merged_context,
+                )
+
             self.state.add_message("assistant", ai_response)
-            self.state.current_question_count += 1
-            
-            # Start timer for next question
+
+            # Start timer for next question (for metrics)
             self.metrics.start_question()
-            
+
             # Send text response
             await send_over_ws(self.ws, {
                 "type": "llm_response",
                 "response": ai_response
             })
-            
+
             # Generate and play TTS audio
             if self.tts_track:
                 await self._play_tts(ai_response)
-            
+
         except Exception as e:
             print(f"❌ AI response error: {e}")
             import traceback

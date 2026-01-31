@@ -3,7 +3,6 @@
 import asyncio
 from src.agents.base import BaseAgent
 from src.core.helper import send_over_ws
-from src.interview_agent.software_engineer import start_interview
 from src.stt import StreamingSpeechProcessor
 
 
@@ -15,10 +14,11 @@ class InterviewAgent(BaseAgent):
             session.state,
             session.metrics,
             session.tts_track,
+            session.flow_manager,
         )
 
     async def start(self):
-        opening = await start_interview()
+        opening = self.session.flow_manager.get_opening_message()
         self.session.state.add_message("assistant", opening)
         self.session.state.interview_started = True
 

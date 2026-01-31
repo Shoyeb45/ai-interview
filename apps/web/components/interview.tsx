@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2, Briefcase, Building2, Clock, User } from "lucide-
 import { envVar } from "@/lib/config";
 import { toast } from "sonner";
 import type { InterviewContext } from "@/lib/interviewApi";
+import apiClient from "@/lib/apiClient";
 
 interface Message {
   role: "user" | "assistant";
@@ -137,6 +138,11 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
 
   const initialiseConnection = async () => {
     try {
+      if (!context?.sessionId) {
+        toast.error("Missing session. Please start the interview from the interview page.");
+        return;
+      }
+
       console.log("🚀 Initializing connection...");
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -211,8 +217,8 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
         }
       };
 
-      const token = crypto.randomUUID();
-      const wsUrl = `${envVar.webSocketUrl}?token=${token}`;
+      const token = apiClient.getAccessToken();
+      const wsUrl = `${envVar.webSocketUrl}?token=${token}&&sessionId=${context?.sessionId}`;
       const ws = new WebSocket(wsUrl);
       
       pcRef.current = pc;
@@ -234,6 +240,22 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
 
       ws.onmessage = async (event) => {
         const data = JSON.parse(event.data);
+
+        if (data.type === "error") {
+          const code = data.code || "UNKNOWN";
+          const message = data.message || "Something went wrong. Please try again.";
+          if (code === "MISSING_CREDENTIALS") {
+            toast.error("Missing credentials. Please start the interview from the interview page.");
+          } else if (code === "FORBIDDEN") {
+            toast.error("Access denied. Please sign in again.");
+          } else if (code === "SESSION_EXPIRED") {
+            toast.error("Session expired or invalid. Please start the interview again.");
+          } else {
+            toast.error(message);
+          }
+          disconnect();
+          return;
+        }
 
         if (data.type === "answer") {
           await pc.setRemoteDescription({
@@ -496,7 +518,8 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
                 {!isConnected ? (
                   <button
                     onClick={initialiseConnection}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                    disabled={!context?.sessionId}
+                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Start interview
                   </button>

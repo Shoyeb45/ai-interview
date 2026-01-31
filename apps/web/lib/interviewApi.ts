@@ -22,6 +22,8 @@ export interface InterviewContext {
   estimatedDuration: number;
   focusAreas: string[];
   experienceLevel?: string;
+  interviewId?: number;
+  sessionId?: number
 }
 
 export const INTERVIEW_CONTEXT_STORAGE_KEY = "interviewContext";
