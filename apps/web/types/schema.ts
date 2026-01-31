@@ -8,7 +8,7 @@ export type InterviewAgentStatus = "DRAFT" | "PUBLISHED" | "PAUSED" | "CLOSED" |
 
 export type QuestionSelectionMode = "CUSTOM_ONLY" | "AI_ONLY" | "MIXED";
 
-export type QuestionCategory = "TECHNICAL" | "BEHAVIORAL" | "CODING";
+export type QuestionCategory = "TECHNICAL" | "BEHAVIORAL" | "CODING" | "PROBLEM_SOLVING" | 'DOMAIN_KNOWLEDGE' | 'CULTURAL_FIT';
 
 export type DifficultyLevel = "EASY" | "MEDIUM" | "HARD";
 
@@ -83,6 +83,7 @@ export interface InterviewAgent {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  sessions?: string[]
   _count?: { sessions: number };
   /** Populated when listing for candidates (hiring manager name & company) */
   createdBy?: { name: string };

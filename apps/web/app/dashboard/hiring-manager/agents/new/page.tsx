@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { createInterviewAgent, createQuestion } from "@/lib/mockApi";
+import { createInterviewAgent } from "@/lib/mockApi";
 import type { ExperienceLevel, InterviewAgentStatus } from "@/types/schema";
 import type { InterviewQuestion, QuestionSelectionMode } from "@/types/schema";
-import AgentQuestionsSection from "@/components/AgentQuestionsSection";
+import AgentQuestionsSection, { AgentFormDetails } from "@/components/AgentQuestionsSection";
 import { toast } from "sonner";
 
 const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
@@ -76,19 +76,8 @@ export default function NewAgentPage() {
         maxAttemptsPerCandidate: form.maxAttemptsPerCandidate,
         deadline: form.deadline || null,
         status: form.status,
+        questions,
       });
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i];
-        await createQuestion(agent.id, {
-          questionText: q.questionText,
-          category: q.category,
-          difficulty: q.difficulty,
-          orderIndex: q.orderIndex,
-          estimatedTime: q.estimatedTime,
-          expectedKeywords: q.expectedKeywords ?? [],
-          focusAreas: q.focusAreas ?? [],
-        });
-      }
       toast.success("Interview agent created");
       router.push(`/dashboard/hiring-manager/agents/${agent.id}`);
     } catch {
@@ -207,14 +196,7 @@ export default function NewAgentPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Questions</h2>
           <AgentQuestionsSection
             agentId={null}
-            formDetails={{
-              title: form.title,
-              role: form.role,
-              jobDescription: form.jobDescription,
-              experienceLevel: form.experienceLevel,
-              focusAreas: form.focusAreas,
-              totalQuestions: form.totalQuestions,
-            }}
+            formDetails={form as AgentFormDetails}
             questionSelectionMode={form.questionSelectionMode}
             onQuestionSelectionModeChange={(mode) => setForm((f) => ({ ...f, questionSelectionMode: mode }))}
             questions={questions}
@@ -245,7 +227,7 @@ export default function NewAgentPage() {
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Deadline (optional)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
           <input
             type="datetime-local"
             value={form.deadline ? form.deadline.slice(0, 16) : ""}

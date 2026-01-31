@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Briefcase, Clock, Users, Calendar } from "lucide-react";
-import { getInterviewAgentById } from "@/lib/mockApi";
+import { ArrowLeft, Briefcase, Clock, Users, Calendar, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { getInterviewAgentById, deleteInterviewAgent } from "@/lib/mockApi";
 import type { InterviewAgent } from "@/types/schema";
 const statusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -20,6 +21,23 @@ export default function AgentDetailPage() {
   const id = Number(params.id);
   const [agent, setAgent] = useState<InterviewAgent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = useCallback(async () => {
+    if (!agent) return;
+    if (!confirm(`Delete "${agent.title}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteInterviewAgent(agent.id);
+      toast.success("Interview agent deleted");
+      router.push("/dashboard/hiring-manager/agents");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete agent";
+      toast.error(message);
+    } finally {
+      setDeleting(false);
+    }
+  }, [agent, router]);
 
   const load = useCallback(async () => {
     if (!id || isNaN(id)) return;
@@ -115,7 +133,7 @@ export default function AgentDetailPage() {
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-2">Job description</h3>
-            <p className="text-gray-700 whitespace-pre-wrap text-sm">{agent.jobDescription}</p>
+            <p className="text-gray-700 whitespace-pre-wrap text-sm">{agent.jobDescription.substring(0, 200) + '.....'}</p>
           </div>
         </div>
         <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3">
@@ -137,6 +155,15 @@ export default function AgentDetailPage() {
           >
             Back to list
           </Link>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-red-600 text-red-600 rounded-lg font-medium hover:bg-red-50 disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete agent
+          </button>
         </div>
       </div>
     </div>

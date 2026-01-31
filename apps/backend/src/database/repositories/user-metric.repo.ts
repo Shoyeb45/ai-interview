@@ -1,5 +1,6 @@
 import { prisma } from '..';
 
+
 async function getUserMetrics(userId: number) {
     let metrics = await prisma.userMetrics.findUnique({
         where: { userId },

@@ -1,4 +1,4 @@
-import { prisma } from "..";
+import { prisma } from '..';
 
 const getDetailedInterviewResultBySession = async (sessionId: number) =>
     await prisma.interviewResult.findUnique({

@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Plus, Users } from "lucide-react";
-import { getInterviewAgents } from "@/lib/mockApi";
+import { Briefcase, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { getInterviewAgents, deleteInterviewAgent } from "@/lib/mockApi";
 import type { InterviewAgent } from "@/types/schema";
 
 const statusColors: Record<string, string> = {
@@ -17,6 +18,7 @@ const statusColors: Record<string, string> = {
 export default function HiringManagerAgentsPage() {
   const [agents, setAgents] = useState<InterviewAgent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -27,6 +29,25 @@ export default function HiringManagerAgentsPage() {
       setLoading(false);
     }
   }, []);
+  const handleDelete = useCallback(
+    async (agent: InterviewAgent) => {
+      if (!confirm(`Delete "${agent.title}"? This cannot be undone.`)) return;
+      setDeletingId(agent.id);
+      try {
+        await deleteInterviewAgent(agent.id);
+        toast.success("Interview agent deleted");
+        await load();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to delete agent";
+        toast.error(message);
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [load]
+  );
+
+  
 
   useEffect(() => {
     load();
@@ -89,11 +110,29 @@ export default function HiringManagerAgentsPage() {
                   </Link>
                   <span className="mx-2 text-gray-300">|</span>
                   <Link
+                    href={`/dashboard/hiring-manager/agents/${agent.id}/edit`}
+                    className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                  >
+                    Edit
+                  </Link>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <Link
                     href={`/dashboard/hiring-manager/agents/${agent.id}/leaderboard`}
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                   >
                     Leaderboard
                   </Link>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(agent)}
+                    disabled={deletingId === agent.id}
+                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+                    aria-label={`Delete ${agent.title}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

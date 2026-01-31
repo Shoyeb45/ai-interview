@@ -4,14 +4,62 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, User, Building2, Briefcase, Clock, Play, AlertCircle, Home } from "lucide-react";
-import {
-  getInterviewAgentByIdForCandidate,
-  getMyAttemptCountForAgent,
-  startSession,
-} from "@/lib/mockApi";
+import { startSession } from "@/lib/mockApi";
+import apiClient from "@/lib/apiClient";
 import type { InterviewAgent, ExperienceLevel } from "@/types/schema";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppShell from "@/components/AppShell";
+
+/** GET /interview-agent/:interviewAgentId response (data key) for candidate start page */
+interface InterviewAgentForCandidateGet {
+  id: number;
+  title: string;
+  role: string;
+  jobDescription: string;
+  totalQuestions: number;
+  estimatedDuration: number;
+  focusAreas: string[];
+  experienceLevel: ExperienceLevel;
+  maxAttemptsPerCandidate: number;
+  deadline: string | null;
+  createdBy?: {
+    id: number;
+    name: string;
+    hiringManagerInformation?: { companyName?: string };
+  };
+  sessions?: unknown[];
+  companyName?: string;
+  userAttemptCount: number;
+  canUserAttempt: boolean;
+}
+
+function mapApiAgentToAgent(data: InterviewAgentForCandidateGet): InterviewAgent {
+  return {
+    id: data.id,
+    createdById: 0,
+    title: data.title,
+    role: data.role,
+    jobDescription: data.jobDescription,
+    experienceLevel: data.experienceLevel,
+    totalQuestions: data.totalQuestions,
+    estimatedDuration: data.estimatedDuration,
+    focusAreas: data.focusAreas ?? [],
+    maxCandidates: 0,
+    maxAttemptsPerCandidate: data.maxAttemptsPerCandidate,
+    deadline: data.deadline,
+    status: "PUBLISHED",
+    scheduledFor: null,
+    publishedAt: null,
+    isActive: true,
+    createdAt: "",
+    updatedAt: "",
+    createdBy: data.createdBy ? { name: data.createdBy.name } : undefined,
+    companyName:
+      data.companyName ??
+      data.createdBy?.hiringManagerInformation?.companyName ??
+      undefined,
+  };
+}
 
 const EXPERIENCE_LABELS: Record<ExperienceLevel, string> = {
   INTERN: "Intern",
@@ -29,6 +77,7 @@ export default function InterviewStartPage() {
   const agentId = Number(params.agentId);
   const [agent, setAgent] = useState<InterviewAgent | null>(null);
   const [attemptCount, setAttemptCount] = useState<number>(0);
+  const [canUserAttempt, setCanUserAttempt] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [readyChecked, setReadyChecked] = useState(false);
@@ -39,12 +88,18 @@ export default function InterviewStartPage() {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const [agentData, count] = await Promise.all([
-        getInterviewAgentByIdForCandidate(agentId),
-        getMyAttemptCountForAgent(agentId),
-      ]);
-      setAgent(agentData ?? null);
-      setAttemptCount(count);
+      const data = await apiClient.get<InterviewAgentForCandidateGet>(
+        `/interview-agent/${agentId}`
+      );
+      if (data) {
+        setAgent(mapApiAgentToAgent(data));
+        setAttemptCount(data.userAttemptCount ?? 0);
+        setCanUserAttempt(data.canUserAttempt ?? true);
+      } else {
+        setAgent(null);
+      }
+    } catch {
+      setAgent(null);
     } finally {
       setLoading(false);
     }
@@ -216,6 +271,12 @@ export default function InterviewStartPage() {
                 </div>
               </dl>
 
+              {!canUserAttempt && (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  You have reached the maximum number of attempts for this interview.
+                </p>
+              )}
+
               <div className="pt-4 border-t border-gray-100">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -235,7 +296,7 @@ export default function InterviewStartPage() {
               <button
                 type="button"
                 onClick={handleStart}
-                disabled={starting || !readyChecked}
+                disabled={starting || !readyChecked || !canUserAttempt}
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Play className="h-5 w-5" />

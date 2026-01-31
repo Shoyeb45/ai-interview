@@ -1,6 +1,7 @@
 import {
     DifficultyLevel,
     ExperienceLevel,
+    InterviewAgentStatus,
     QuestionCategory,
     QuestionSelectionMode,
 } from '@prisma/client';
@@ -27,9 +28,10 @@ const createInterviewAgent = z.object({
     questionSelectionMode: z.enum(QuestionSelectionMode),
     maxCandidates: z.coerce.number(),
     maxAttemptsPerCandidate: z.coerce.number(),
-    deadline: z.iso
-        .datetime({ offset: true })
-        .transform((val) => new Date(val)),
+    deadline: z
+        .union([z.string().datetime({ offset: true }), z.null()])
+        .optional()
+        .transform((val) => (val == null ? null : new Date(val as string))),
     questions: z.array(questionCreate),
 });
 
@@ -37,6 +39,7 @@ const generateQuestion = createInterviewAgent.omit({
     maxAttemptsPerCandidate: true,
     maxCandidates: true,
     deadline: true,
+    questions: true
 });
 
 const interviewAgentParam = z.object({
@@ -45,8 +48,9 @@ const interviewAgentParam = z.object({
 
 const updateInterviewAgent = createInterviewAgent.partial().extend({
     questions: z.array(questionCreate.partial().extend({
-        questionId: z.coerce.number()
-    }))
+        questionId: z.number().optional()
+    })).optional(),
+    status: z.enum(InterviewAgentStatus).optional()
 });
 
 const questionParam = z.object({

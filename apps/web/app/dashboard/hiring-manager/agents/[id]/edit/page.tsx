@@ -4,10 +4,61 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getInterviewAgentById, updateInterviewAgent } from "@/lib/mockApi";
+import apiClient from "@/lib/apiClient";
 import type { ExperienceLevel, InterviewAgentStatus, QuestionSelectionMode, InterviewQuestion } from "@/types/schema";
 import AgentQuestionsSection from "@/components/AgentQuestionsSection";
 import { toast } from "sonner";
+
+/** GET /interview-agent/:interviewAgentId response (data key) */
+export interface InterviewAgentEditGet {
+  title: string;
+  role: string;
+  jobDescription: string;
+  experienceLevel: ExperienceLevel;
+  totalQuestions: number;
+  estimatedDuration: number;
+  focusAreas: string[];
+  maxCandidates: number;
+  maxAttemptsPerCandidate: number;
+  deadline: string | null;
+  questions: {
+    questionText: string;
+    category: string;
+    difficulty: string;
+    orderIndex: number;
+    estimatedTime: number;
+    id: number;
+  }[];
+  id: number;
+  status: InterviewAgentStatus;
+  questionSelectionMode?: QuestionSelectionMode;
+}
+
+/** PATCH /interview-agent/:interviewAgentId body. New questions use questionId undefined. */
+export interface InterviewAgentPatchBody {
+  questions?: {
+    questionId?: number;
+    questionText?: string;
+    category?: "TECHNICAL" | "BEHAVIORAL" | "PROBLEM_SOLVING" | "DOMAIN_KNOWLEDGE" | "CULTURAL_FIT" | "CODING";
+    difficulty?: "EASY" | "MEDIUM" | "HARD";
+    orderIndex?: number;
+    estimatedTime?: number;
+    expectedKeywords?: string[];
+    focusAreas?: string[];
+  }[];
+  title?: string;
+  role?: string;
+  status: InterviewAgentStatus;
+  jobDescription?: string;
+  experienceLevel?: ExperienceLevel;
+  totalQuestions?: number;
+  estimatedDuration?: number;
+  focusAreas?: string[];
+  questionSelectionMode?: QuestionSelectionMode;
+  maxCandidates?: number;
+  maxAttemptsPerCandidate?: number;
+  deadline?: string | null;
+}
 
 const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
   { value: "INTERN", label: "Intern" },
@@ -56,24 +107,42 @@ export default function EditAgentPage() {
     if (!id || isNaN(id)) return;
     setLoading(true);
     try {
-      const agent = await getInterviewAgentById(id);
-      if (agent) {
+      const data = await apiClient.get<InterviewAgentEditGet>(`/interview-agent/detailed/${id}`);
+      if (data) {
         setForm({
-          title: agent.title,
-          role: agent.role,
-          jobDescription: agent.jobDescription,
-          experienceLevel: agent.experienceLevel,
-          questionSelectionMode: (agent.questionSelectionMode ?? "MIXED") as QuestionSelectionMode,
-          totalQuestions: agent.totalQuestions,
-          estimatedDuration: agent.estimatedDuration,
-          focusAreas: agent.focusAreas ?? [],
-          maxCandidates: agent.maxCandidates,
-          maxAttemptsPerCandidate: agent.maxAttemptsPerCandidate,
-          deadline: agent.deadline ? new Date(agent.deadline).toISOString().slice(0, 16) : "",
-          status: agent.status,
+          title: data.title,
+          role: data.role,
+          jobDescription: data.jobDescription,
+          experienceLevel: data.experienceLevel as ExperienceLevel,
+          questionSelectionMode: (data.questionSelectionMode ?? "MIXED") as QuestionSelectionMode,
+          totalQuestions: data.totalQuestions,
+          estimatedDuration: data.estimatedDuration,
+          focusAreas: data.focusAreas ?? [],
+          maxCandidates: data.maxCandidates,
+          maxAttemptsPerCandidate: data.maxAttemptsPerCandidate,
+          deadline: data.deadline ? new Date(data.deadline).toISOString().slice(0, 16) : "",
+          status: data.status,
         });
-        setQuestions(agent.questions ?? []);
+        const mappedQuestions: InterviewQuestion[] = (data.questions ?? [])
+          .slice()
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((q) => ({
+            id: q.id,
+            interviewAgentId: id,
+            questionText: q.questionText,
+            category: q.category as InterviewQuestion["category"],
+            difficulty: q.difficulty as InterviewQuestion["difficulty"],
+            orderIndex: q.orderIndex,
+            estimatedTime: q.estimatedTime,
+            isActive: true,
+            expectedKeywords: [],
+            focusAreas: [],
+          }));
+        setQuestions(mappedQuestions);
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load agent";
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -96,7 +165,7 @@ export default function EditAgentPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await updateInterviewAgent(id, {
+      const body: InterviewAgentPatchBody = {
         title: form.title,
         role: form.role,
         jobDescription: form.jobDescription,
@@ -109,11 +178,23 @@ export default function EditAgentPage() {
         maxAttemptsPerCandidate: form.maxAttemptsPerCandidate,
         deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
         status: form.status,
-      });
+        questions: questions.map((q, index) => ({
+          questionId: q.id > 0 ? q.id : undefined,
+          questionText: q.questionText,
+          category: q.category,
+          difficulty: q.difficulty,
+          orderIndex: index + 1,
+          estimatedTime: q.estimatedTime,
+          expectedKeywords: q.expectedKeywords?.length ? q.expectedKeywords : undefined,
+          focusAreas: q.focusAreas?.length ? q.focusAreas : undefined,
+        })),
+      };
+      await apiClient.patch<unknown, InterviewAgentPatchBody>(`/interview-agent/${id}`, body);
       toast.success("Interview agent updated");
       router.push(`/dashboard/hiring-manager/agents/${id}`);
-    } catch {
-      toast.error("Failed to update agent");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update agent";
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -236,14 +317,7 @@ export default function EditAgentPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Questions</h2>
           <AgentQuestionsSection
             agentId={id}
-            formDetails={{
-              title: form.title,
-              role: form.role,
-              jobDescription: form.jobDescription,
-              experienceLevel: form.experienceLevel,
-              focusAreas: form.focusAreas,
-              totalQuestions: form.totalQuestions,
-            }}
+            formDetails={form}
             questionSelectionMode={form.questionSelectionMode}
             onQuestionSelectionModeChange={(mode) => setForm((f) => ({ ...f, questionSelectionMode: mode }))}
             questions={questions}

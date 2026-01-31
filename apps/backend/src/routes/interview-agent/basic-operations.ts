@@ -13,6 +13,22 @@ import { verifyInterviewAgent, verifyQuestionExists } from './validator';
 
 const router = Router();
 
+
+router.get(
+    '/detailed/:interviewAgentId',
+    authorize(RoleCode.HIRING_MANAGER),
+    validator(schema.interviewAgentParam, ValidationSource.PARAM),
+    asyncHandler<ProtectedRequest>(async (req, res) => {
+        const interviewAgentId = Number(req.params.interviewAgentId);
+        const agent = await interviewAgentRepo.getInterviewAgentWithQuestionsById(
+            interviewAgentId,
+        );
+        if (!agent) throw new BadRequestError('Invalid interview agent ID');
+
+        new SuccessResponse('Interview agent fetched.', agent).send(res);
+    })
+)
+
 // delete specific question
 router.delete(
     '/question/:questionId',
@@ -72,15 +88,14 @@ router.get(
                 req.user.id,
             );
 
-        new SuccessResponse('Interview agents fetched successfully.', {
-            interviewAgents,
-        }).send(res);
+        new SuccessResponse('Interview agents fetched successfully.', interviewAgents).send(res);
     }),
 );
 
 router.get(
     '/:interviewAgentId',
     authorize(RoleCode.HIRING_MANAGER, RoleCode.USER),
+    validator(schema.interviewAgentParam, ValidationSource.PARAM),
     asyncHandler<ProtectedRequest>(async (req, res) => {
         const interviewAgentId = Number(req.params.interviewAgentId);
         const agent = await interviewAgentRepo.getInterviewAgentDetailById(
@@ -92,6 +107,7 @@ router.get(
 
         new SuccessResponse('Interview agent fetched.', {
             ...agent,
+            companyName: agent.createdBy.hiringManagerInformation?.companyName,
             userAttemptCount: agent.sessions.length,
             canUserAttempt:
                 agent.sessions.length < agent.maxAttemptsPerCandidate &&

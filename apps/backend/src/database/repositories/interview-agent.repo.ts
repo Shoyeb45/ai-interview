@@ -1,7 +1,7 @@
 import { InterviewAgentStatus } from '@prisma/client';
-import { prisma } from '..';
 import { InterviewAgentSchema } from '../../routes/interview-agent/schema';
 import _ from 'lodash';
+import { prisma } from '..';
 
 const create = async (
     data: InterviewAgentSchema['CreateInterviewAgent'],
@@ -32,6 +32,7 @@ const getInterviewAgentsByHiringManagerId = async (createdById: number) =>
     await prisma.interviewAgent.findMany({
         where: {
             createdById,
+            isActive: true,
         },
         select: {
             id: true,
@@ -92,6 +93,9 @@ const getAvailableInterviews = async () =>
         where: {
             isActive: true,
             status: InterviewAgentStatus.PUBLISHED,
+            deadline: {
+                gte: new Date()
+            }
         },
         select: {
             id: true,
@@ -269,8 +273,8 @@ const update = async (
             },
         });
 
-        // Handle questions if provided
-        if (data.questions && data.questions.length > 0) {
+        // Handle questions when payload includes questions (array may be empty = remove all)
+        if (data.questions !== undefined) {
             const questionUpdates: Promise<unknown>[] = [];
             const questionIdsInUpdate: number[] = [];
 
@@ -314,29 +318,17 @@ const update = async (
                 }
             });
 
-            // Delete questions that are not in the update list
-            // (questions that existed before but are not in the current update)
-            if (questionIdsInUpdate.length > 0) {
-                questionUpdates.push(
-                    tx.interviewQuestion.deleteMany({
-                        where: {
-                            interviewAgentId,
-                            id: {
-                                notIn: questionIdsInUpdate,
-                            },
-                        },
-                    }),
-                );
-            } else {
-                // If no existing questions in update, delete all questions for this agent
-                questionUpdates.push(
-                    tx.interviewQuestion.deleteMany({
-                        where: {
-                            interviewAgentId,
-                        },
-                    }),
-                );
-            }
+            // Delete questions that were removed from the list (exist in DB but not in payload)
+            questionUpdates.push(
+                tx.interviewQuestion.deleteMany({
+                    where: {
+                        interviewAgentId,
+                        ...(questionIdsInUpdate.length > 0
+                            ? { id: { notIn: questionIdsInUpdate } }
+                            : {}),
+                    },
+                }),
+            );
 
             await Promise.all(questionUpdates);
         }
@@ -358,6 +350,41 @@ const checkQuestionById = async (questionId: number) => {
         }
     });
 };
+
+const getInterviewAgentWithQuestionsById = async (interviewAgentId: number) => {
+    return await prisma.interviewAgent.findUnique({
+        where: {
+            id: interviewAgentId,
+            isActive: true
+        },
+        select: {
+            id: true,
+            title: true,
+            role: true,
+            jobDescription: true,
+            experienceLevel: true,
+            totalQuestions: true,
+            estimatedDuration: true,
+            focusAreas: true,
+            questionSelectionMode: true,
+            questions: {
+                select: {
+                    id: true,
+                    questionText: true,
+                    category: true,
+                    difficulty: true,
+                    orderIndex: true,
+                    estimatedTime: true,
+                }
+            },
+            maxCandidates: true,
+            maxAttemptsPerCandidate: true,
+            deadline: true,
+            status: true
+        }
+    });
+}
+
 export default {
     create,
     getInterviewAgentsByHiringManagerId,
@@ -368,5 +395,6 @@ export default {
     checkById,
     update,
     deleteQuestionById,
-    checkQuestionById
+    checkQuestionById,
+    getInterviewAgentWithQuestionsById
 };

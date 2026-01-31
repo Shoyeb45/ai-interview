@@ -1,10 +1,8 @@
 import { RoleCode } from '@prisma/client';
 import { InternalError } from '../../core/ApiError';
-import { getPrismaClient } from '../index';
 import { AuthUser } from '../../types/user';
 import userMetricRepo from './user-metric.repo';
-
-const prisma = getPrismaClient();
+import { prisma } from '..';
 
 async function findByEmail(email: string): Promise<AuthUser | null> {
     const user = await prisma.user.findUnique({
@@ -54,7 +52,6 @@ async function create(
     refreshTokenKey: string,
     roleCode: RoleCode,
 ) {
-    const prisma = getPrismaClient();
 
     // Find or get the role
     const role = await prisma.role.findUnique({
@@ -149,7 +146,6 @@ async function create(
 }
 
 async function findById(id: number): Promise<AuthUser | null> {
-    const prisma = getPrismaClient();
 
     const user = await prisma.user.findFirst({
         where: {
@@ -202,14 +198,12 @@ async function findById(id: number): Promise<AuthUser | null> {
 }
 
 async function checkById(id: number) {
-    const prisma = getPrismaClient();
     return prisma.user.findUnique({
         where: { id },
     });
 }
 
 async function checkByEmail(email: string) {
-    const prisma = getPrismaClient();
     return prisma.user.findUnique({
         where: { email },
     });

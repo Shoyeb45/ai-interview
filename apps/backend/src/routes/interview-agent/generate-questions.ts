@@ -20,9 +20,7 @@ router.post(
         const data = req.body as InterviewAgentSchema['GenerateQuestion'];
         const questions = await getInterviewQuestions(data);
 
-        new SuccessResponse('Generated questions successfully.', {
-            questions
-        }).send(res);
+        new SuccessResponse('Generated questions successfully.', questions.questions).send(res);
     }),
 );
 
