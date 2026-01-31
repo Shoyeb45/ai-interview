@@ -1,3 +1,4 @@
+import { SessionStatus } from '@prisma/client';
 import { prisma } from '..';
 
 const getSessionsByUserId = async (userId: number) =>
@@ -26,8 +27,46 @@ const getSessionsByUserId = async (userId: number) =>
     });
 
 
+const startInterview = async (sessionId: number) => {
+    return await prisma.candidateInterviewSession.update({
+        where: {
+            id: sessionId
+        },
+        data: {
+            startedAt: new Date(),
+            status: SessionStatus.IN_PROGRESS,
+        }
+    });
+}
 
+const endInterview = async (sessionId: number) => {
+    return await prisma.candidateInterviewSession.update({
+        where: {
+            id: sessionId,
+        },
+        data: {
+            status: SessionStatus.COMPLETED,
+            completedAt: new Date(),
+        }
+    });
+}
+
+const abandonInterview = async (sessionId: number, abandonReason?: string) => {
+    return await prisma.candidateInterviewSession.update({
+        where: {
+            id: sessionId,
+        },
+        data: {
+            status: SessionStatus.ABANDONED,
+            abandonedAt: new Date(),
+            abandonReason: abandonReason ?? null,
+        }
+    });
+}
 
 export default {
-    getSessionsByUserId
+    getSessionsByUserId,
+    endInterview,
+    abandonInterview,
+    startInterview
 };

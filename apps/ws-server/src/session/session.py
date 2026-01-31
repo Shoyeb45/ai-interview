@@ -12,6 +12,7 @@ class InterviewSession:
         self.state = SpeechState()
         self.metrics = InterviewMetrics()
         self.flow_manager: InterviewFlowManager | None = None
+        self.interview_completed = False  # True when we sent closing message (successful end)
         self.transport = None  # set by manager (Transport abstraction)
         self.ws = None  # set by WebRTC/WS layer (legacy; prefer transport)
         self.tts_track = None  # set by WebRTC layer (legacy; prefer transport)

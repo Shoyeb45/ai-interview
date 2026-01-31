@@ -14,6 +14,16 @@ async function getAndStoreSessionDetails(interviewAgentId: number, userId: numbe
     logger.info('Stored interview agent successfully.');
 }
 
+async function analyzeQuestion() {
+    
+}
+
+async function generateReport() {
+
+}
+
 export default {
-    getAndStoreSessionDetails
+    getAndStoreSessionDetails,
+    analyzeQuestion,
+    generateReport
 };
