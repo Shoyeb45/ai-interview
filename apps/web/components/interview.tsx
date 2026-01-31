@@ -24,6 +24,7 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isAISpeaking, setIsAISpeaking] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentTranscript, setCurrentTranscript] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -52,20 +53,20 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
     console.log("🔇 Microphone muted");
   };
 
-  // Unmute microphone
-  const unmuteMicrophone = () => {
-    if (pcRef.current && !isAISpeaking) {
-      pcRef.current.getSenders().forEach((sender) => {
-        if (sender.track && sender.track.kind === "audio") {
-          sender.track.enabled = true;
-        }
-      });
-      setIsListening(true);
-      console.log("🎤 Microphone unmuted");
-    }
+  // Unmute microphone (forceUnmute = true when backend says AI/user finished, so we don't rely on stale state)
+  const unmuteMicrophone = (forceUnmute = false) => {
+    if (!pcRef.current) return;
+    if (!forceUnmute && isAISpeaking) return;
+    pcRef.current.getSenders().forEach((sender) => {
+      if (sender.track && sender.track.kind === "audio") {
+        sender.track.enabled = true;
+      }
+    });
+    setIsListening(true);
+    console.log("🎤 Microphone unmuted");
   };
 
-  // Clear AI speaking state and unmute
+  // Clear AI speaking state and unmute (backend-driven; force unmute so we don't depend on stale isAISpeaking)
   const clearAISpeaking = () => {
     console.log("✅ Clearing AI speaking state");
     
@@ -76,7 +77,7 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
     }
     
     setIsAISpeaking(false);
-    unmuteMicrophone();
+    unmuteMicrophone(true);
   };
 
   // Monitor audio playback (listeners use clearAISpeaking; intentionally run once on mount)
@@ -246,60 +247,81 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
           if (data.is_final) {
             addMessage("user", data.text);
             setCurrentTranscript("");
+            setIsAnalyzing(false);
           } else {
             setCurrentTranscript(data.text);
           }
         }
 
         if (data.type === "processing") {
-          setCurrentTranscript("Processing your speech...");
+          const status = data.status === "analyzing" ? "analyzing" : data.status;
+          setCurrentTranscript(status === "analyzing" ? "Analyzing your answer…" : "Processing…");
+          setIsAnalyzing(true);
         }
 
         if (data.type === "ai_status") {
           muteMicrophone();
         }
 
+        // Backend is source of truth for mic: mute when AI speaking, unmute when AI finished
+        if (data.type === "ai_speaking") {
+          if (data.speaking) {
+            console.log("🔊 Backend: AI speaking — muting mic");
+            muteMicrophone();
+            setIsAISpeaking(true);
+            setIsAnalyzing(false);
+            // Resume audio element if it was paused (e.g. after user interrupted); otherwise second TTS is silent
+            if (audioRef.current?.paused) {
+              audioRef.current.play().catch(() => {});
+            }
+            if (aiSpeakingTimeoutRef.current) {
+              clearTimeout(aiSpeakingTimeoutRef.current);
+              aiSpeakingTimeoutRef.current = null;
+            }
+            const BACKUP_TIMEOUT = 15000;
+            aiSpeakingTimeoutRef.current = setTimeout(() => {
+              console.log("⏰ Backup timeout — force unmuting");
+              clearAISpeaking();
+            }, BACKUP_TIMEOUT);
+          } else {
+            console.log("🔇 Backend: AI finished — unmuting mic");
+            clearAISpeaking();
+          }
+        }
+
         if (data.type === "llm_response") {
           setMessages((prev) => prev.filter((m) => m.content !== "💭 Thinking..."));
           addMessage("assistant", data.response);
-
-          // Clear any existing timeout
-          if (aiSpeakingTimeoutRef.current) {
-            clearTimeout(aiSpeakingTimeoutRef.current);
+          setIsAnalyzing(false);
+          // Mic and isAISpeaking are driven by ai_speaking; only set backup timeout if not already set
+          if (!aiSpeakingTimeoutRef.current) {
+            muteMicrophone();
+            setIsAISpeaking(true);
+            aiSpeakingTimeoutRef.current = setTimeout(() => {
+              console.log("⏰ Backup timeout (no ai_speaking) — force unmuting");
+              clearAISpeaking();
+            }, 15000);
           }
-
-          // Mute mic immediately when AI starts responding
-          muteMicrophone();
-          setIsAISpeaking(true);
-
-          // MUCH SHORTER backup timeout - just a safety net
-          // Most responses will finish within 10 seconds
-          // The audio 'ended' event should fire first in 99% of cases
-          const BACKUP_TIMEOUT = 10000; // 10 seconds max
-          
-          console.log(`⏰ Setting backup timeout: ${BACKUP_TIMEOUT}ms`);
-
-          aiSpeakingTimeoutRef.current = setTimeout(() => {
-            console.log("⏰ BACKUP TIMEOUT - force unmuting (audio events may have failed)");
-            clearAISpeaking();
-          }, BACKUP_TIMEOUT);
         }
 
         if (data.type === "interviewer_tip") {
           addMessage("assistant", `💡 ${data.message}`);
         }
 
+        // User started/stopped speaking — drive mic from backend so it turns off at the right time
         if (data.type === "user_speaking") {
           if (data.speaking) {
-            console.log("🗣️ User started speaking - interrupting AI");
-            
-            // Stop AI audio immediately
+            console.log("🗣️ Backend: user started speaking");
             if (audioRef.current && !audioRef.current.paused) {
               audioRef.current.pause();
               audioRef.current.currentTime = 0;
             }
-            
             clearAISpeaking();
+            setIsAnalyzing(false);
+          } else {
+            console.log("🔇 Backend: user stopped speaking — muting mic (analyzing)");
+            muteMicrophone();
+            setIsAnalyzing(true);
           }
         }
 
@@ -379,6 +401,7 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
     setIsConnected(false);
     setIsListening(false);
     setIsAISpeaking(false);
+    setIsAnalyzing(false);
     setCurrentTranscript("");
   };
 
@@ -591,6 +614,8 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
                 <p className="text-slate-700 font-medium">
                   {isAISpeaking
                     ? "Interviewer is speaking…"
+                    : isAnalyzing
+                    ? "Analyzing your answer…"
                     : isListening
                     ? "You’re live — speak when ready"
                     : "Microphone off — click to unmute"}
@@ -600,6 +625,9 @@ export default function VoiceChat({ context }: VoiceChatProps = {}) {
                     <Volume2 className="w-4 h-4 animate-pulse" />
                     <span className="text-sm font-medium">Listening to response</span>
                   </div>
+                )}
+                {isAnalyzing && !isAISpeaking && (
+                  <p className="text-amber-600 text-sm mt-1">We&apos;ll respond in a moment</p>
                 )}
               </div>
             </div>

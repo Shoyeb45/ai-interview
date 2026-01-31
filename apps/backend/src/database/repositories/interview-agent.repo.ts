@@ -63,6 +63,7 @@ const getInterviewAgentDetailById = async (id: number, userId?: number) =>
             experienceLevel: true,
             maxAttemptsPerCandidate: true,
             deadline: true,
+            // openingMessage: true,
             createdBy: {
                 select: {
                     id: true,
@@ -367,6 +368,7 @@ const getInterviewAgentWithQuestionsById = async (interviewAgentId: number) => {
             estimatedDuration: true,
             focusAreas: true,
             questionSelectionMode: true,
+
             questions: {
                 select: {
                     id: true,
@@ -380,7 +382,8 @@ const getInterviewAgentWithQuestionsById = async (interviewAgentId: number) => {
             maxCandidates: true,
             maxAttemptsPerCandidate: true,
             deadline: true,
-            status: true
+            status: true,
+            openingMessage: true
         }
     });
 }

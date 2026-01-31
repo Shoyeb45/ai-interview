@@ -145,10 +145,10 @@ class StreamingSpeechProcessor:
         # Get answer duration
         answer_duration = self.metrics.get_answer_duration()
         
-        # Send processing indicator
+        # Send processing indicator (full utterance built; analyzing now)
         await send_over_ws(self.ws, {
             "type": "processing",
-            "status": "transcribing"
+            "status": "analyzing"
         })
         
         # Transcribe

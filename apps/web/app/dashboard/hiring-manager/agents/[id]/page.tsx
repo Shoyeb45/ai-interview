@@ -131,6 +131,12 @@ export default function AgentDetailPage() {
               ))}
             </div>
           </div>
+          {agent.openingMessage && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Opening message</h3>
+              <p className="text-gray-700 whitespace-pre-wrap text-sm">{agent.openingMessage}</p>
+            </div>
+          )}
           <div>
             <h3 className="text-sm font-medium text-gray-700 mb-2">Job description</h3>
             <p className="text-gray-700 whitespace-pre-wrap text-sm">{agent.jobDescription.substring(0, 200) + '.....'}</p>

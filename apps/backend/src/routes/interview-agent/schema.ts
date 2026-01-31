@@ -33,6 +33,7 @@ const createInterviewAgent = z.object({
         .optional()
         .transform((val) => (val == null ? null : new Date(val as string))),
     questions: z.array(questionCreate),
+    openingMessage: z.string().optional()
 });
 
 const generateQuestion = createInterviewAgent.omit({

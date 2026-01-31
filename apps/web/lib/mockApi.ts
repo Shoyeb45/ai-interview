@@ -335,6 +335,7 @@ export async function createInterviewAgent(data: {
   title: string;
   role: string;
   jobDescription: string;
+  openingMessage?: string;
   experienceLevel: ExperienceLevel;
   questionSelectionMode?: QuestionSelectionMode;
   totalQuestions?: number;

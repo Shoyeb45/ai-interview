@@ -38,6 +38,7 @@ export default function NewAgentPage() {
     title: "",
     role: "",
     jobDescription: "",
+    openingMessage: "",
     experienceLevel: "MID_LEVEL" as ExperienceLevel,
     questionSelectionMode: "MIXED" as QuestionSelectionMode,
     totalQuestions: 6,
@@ -67,6 +68,7 @@ export default function NewAgentPage() {
         title: form.title,
         role: form.role,
         jobDescription: form.jobDescription,
+        openingMessage: form.openingMessage || undefined,
         experienceLevel: form.experienceLevel,
         questionSelectionMode: form.questionSelectionMode,
         totalQuestions: form.totalQuestions,
@@ -132,6 +134,16 @@ export default function NewAgentPage() {
             value={form.jobDescription}
             onChange={(e) => setForm((f) => ({ ...f, jobDescription: e.target.value }))}
             placeholder="Paste or describe the job requirements..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Opening message (optional)</label>
+          <textarea
+            rows={3}
+            value={form.openingMessage}
+            onChange={(e) => setForm((f) => ({ ...f, openingMessage: e.target.value }))}
+            placeholder="Message shown to the candidate at the start of the interview..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>

@@ -83,6 +83,8 @@ export interface InterviewAgent {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Message shown to candidate at the start of the interview */
+  openingMessage?: string | null;
   sessions?: string[]
   _count?: { sessions: number };
   /** Populated when listing for candidates (hiring manager name & company) */

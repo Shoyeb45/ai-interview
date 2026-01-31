@@ -14,6 +14,7 @@ export interface InterviewAgentEditGet {
   title: string;
   role: string;
   jobDescription: string;
+  openingMessage?: string | null;
   experienceLevel: ExperienceLevel;
   totalQuestions: number;
   estimatedDuration: number;
@@ -58,6 +59,7 @@ export interface InterviewAgentPatchBody {
   maxCandidates?: number;
   maxAttemptsPerCandidate?: number;
   deadline?: string | null;
+  openingMessage?: string | null;
 }
 
 const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
@@ -91,6 +93,7 @@ export default function EditAgentPage() {
     title: "",
     role: "",
     jobDescription: "",
+    openingMessage: "",
     experienceLevel: "MID_LEVEL" as ExperienceLevel,
     questionSelectionMode: "MIXED" as QuestionSelectionMode,
     totalQuestions: 6,
@@ -113,6 +116,7 @@ export default function EditAgentPage() {
           title: data.title,
           role: data.role,
           jobDescription: data.jobDescription,
+          openingMessage: data.openingMessage ?? "",
           experienceLevel: data.experienceLevel as ExperienceLevel,
           questionSelectionMode: (data.questionSelectionMode ?? "MIXED") as QuestionSelectionMode,
           totalQuestions: data.totalQuestions,
@@ -169,6 +173,7 @@ export default function EditAgentPage() {
         title: form.title,
         role: form.role,
         jobDescription: form.jobDescription,
+        openingMessage: form.openingMessage,
         experienceLevel: form.experienceLevel,
         questionSelectionMode: form.questionSelectionMode,
         totalQuestions: form.totalQuestions,
@@ -253,6 +258,16 @@ export default function EditAgentPage() {
             value={form.jobDescription}
             onChange={(e) => setForm((f) => ({ ...f, jobDescription: e.target.value }))}
             placeholder="Paste or describe the job requirements..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Opening message (optional)</label>
+          <textarea
+            rows={3}
+            value={form.openingMessage}
+            onChange={(e) => setForm((f) => ({ ...f, openingMessage: e.target.value }))}
+            placeholder="Message shown to the candidate at the start of the interview..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
