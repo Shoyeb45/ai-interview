@@ -5,6 +5,7 @@
  */
 
 import { startSession } from "@/lib/mockApi";
+import apiClient from "./apiClient";
 
 export interface InitiateInterviewResult {
   sessionId: number;
@@ -40,9 +41,9 @@ export async function initiateInterview(
   agentId: number
 ): Promise<InitiateInterviewResult> {
   // Mock: delegates to startSession; replace with real API when ready.
-  const session = await startSession(agentId);
+  const session = await apiClient.post<InitiateInterviewResult>(`/interview/${agentId}`);
   return {
-    sessionId: session.id,
+    sessionId: session.sessionId,
     interviewId: session.interviewId,
   };
 }

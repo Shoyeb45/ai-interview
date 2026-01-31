@@ -604,6 +604,7 @@ export async function startSession(
   interviewAgentId: number,
 ): Promise<CandidateInterviewSession> {
   await delay(500);
+  const ids = await apiClient.post<CandidateInterviewSession>(`/interview/${interviewAgentId}`);
   const agent = mockAgents.find((a) => a.id === interviewAgentId);
   if (!agent) throw new Error("Interview not found or no longer available.");
   const currentCandidateId = 1;

@@ -139,6 +139,68 @@ const checkById = async (id: number) =>
         },
     });
 
+
+interface InterviewAgentLimits {
+    maxAttemptsPerCandidate: number;
+    totalUniqueCandidates: number;
+    userAttemptCount: number;
+    maxCandidates: number;
+    canUserAttempt: boolean;
+    canAcceptNewCandidates: boolean;
+}
+
+const getInterviewAgentLimits = async (
+    agentId: number,
+    userId: number
+): Promise<InterviewAgentLimits | null> => {
+    // Get the interview agent with its settings
+    const agent = await prisma.interviewAgent.findUnique({
+        where: {
+            id: agentId,
+        },
+        select: {
+            maxAttemptsPerCandidate: true,
+            maxCandidates: true,
+        },
+    });
+
+    if (!agent) {
+        return null;
+    }
+
+    // Count unique candidates who have attempted this interview
+    // (at least one session created)
+    const totalUniqueCandidates = await prisma.candidateInterviewSession.groupBy({
+        by: ['candidateId'],
+        where: {
+            interviewAgentId: agentId,
+        },
+        _count: {
+            candidateId: true,
+        },
+    });
+
+    // Count this specific user's attempts
+    const userAttemptCount = await prisma.candidateInterviewSession.count({
+        where: {
+            interviewAgentId: agentId,
+            candidateId: userId,
+        },
+    });
+
+    const uniqueCandidateCount = totalUniqueCandidates.length;
+
+    return {
+        maxAttemptsPerCandidate: agent.maxAttemptsPerCandidate,
+        totalUniqueCandidates: uniqueCandidateCount,
+        userAttemptCount,
+        maxCandidates: agent.maxCandidates,
+        canUserAttempt: userAttemptCount < agent.maxAttemptsPerCandidate,
+        canAcceptNewCandidates: uniqueCandidateCount < agent.maxCandidates,
+    };
+};
+
+
 interface LeaderboardEntry {
     rank: number;
     candidateId: number;
@@ -399,5 +461,6 @@ export default {
     update,
     deleteQuestionById,
     checkQuestionById,
-    getInterviewAgentWithQuestionsById
+    getInterviewAgentWithQuestionsById,
+    getInterviewAgentLimits,
 };
