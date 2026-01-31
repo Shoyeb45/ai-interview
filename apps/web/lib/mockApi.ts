@@ -11,7 +11,6 @@ import type {
   CandidateInterviewSession,
   InterviewResult,
   UserMetrics,
-  CompanySize,
   ExperienceLevel,
   InterviewAgentStatus,
   QuestionSelectionMode,
@@ -637,36 +636,11 @@ export async function startSession(
   return newSession;
 }
 
-// ─── Candidate: User metrics ─────────────────────────────────────────────────
-
-const mockMetrics: UserMetrics = {
-  id: 1,
-  userId: 1,
-  totalInterviews: 5,
-  completedInterviews: 4,
-  averageScore: 72,
-  scoreHistory: [
-    { date: "2025-01-10", score: 68 },
-    { date: "2025-01-15", score: 71 },
-    { date: "2025-01-20", score: 75 },
-    { date: "2025-01-25", score: 78 },
-  ],
-  skillProgress: {},
-  totalPracticeTime: 120,
-  avgInterviewDuration: 26,
-  strongestSkills: ["Algorithms", "Communication"],
-  improvingSkills: ["System Design"],
-  needsWorkSkills: ["Behavioral"],
-  lastInterviewDate: "2025-01-25T14:00:00Z",
-};
-
 export async function getMyMetrics(): Promise<UserMetrics> {
   await delay(350);
   const userMetric = await apiClient.get<UserMetrics>("/user/dashboard");
   return userMetric;
 }
-
-// ─── Hiring Manager: Sessions per agent (with candidate for leaderboard) ───────
 
 export async function getSessionsByAgentId(
   agentId: number,

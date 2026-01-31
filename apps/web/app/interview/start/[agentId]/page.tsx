@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, User, Building2, Briefcase, Clock, Play, AlertCircle, Home } from "lucide-react";
-import { startSession } from "@/lib/mockApi";
+import { initiateInterview, INTERVIEW_CONTEXT_STORAGE_KEY, type InterviewContext } from "@/lib/interviewApi";
 import apiClient from "@/lib/apiClient";
+import PreparingInterviewScreen from "@/components/PreparingInterviewScreen";
 import type { InterviewAgent, ExperienceLevel } from "@/types/schema";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppShell from "@/components/AppShell";
@@ -114,8 +115,24 @@ export default function InterviewStartPage() {
     setStarting(true);
     setErrorMessage(null);
     try {
-      const session = await startSession(agent.id);
-      router.push(`/interview/${session.interviewId}/live`);
+      const result = await initiateInterview(agent.id);
+      const context: InterviewContext = {
+        title: agent.title,
+        role: agent.role,
+        companyName: agent.companyName,
+        hiringManagerName: agent.createdBy?.name,
+        totalQuestions: agent.totalQuestions,
+        estimatedDuration: agent.estimatedDuration,
+        focusAreas: agent.focusAreas ?? [],
+        experienceLevel: agent.experienceLevel,
+      };
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          INTERVIEW_CONTEXT_STORAGE_KEY,
+          JSON.stringify(context)
+        );
+      }
+      router.push(`/interview/${result.interviewId}/live`);
     } catch (err) {
       setStarting(false);
       const message = err instanceof Error ? err.message : "Failed to start interview. Please try again.";
@@ -177,6 +194,7 @@ export default function InterviewStartPage() {
   return (
     <ProtectedRoute>
       <AppShell>
+        {starting && <PreparingInterviewScreen />}
         <div className="max-w-2xl mx-auto space-y-6">
           <Link
             href="/interview"

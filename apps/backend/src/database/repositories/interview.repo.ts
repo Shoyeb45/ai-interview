@@ -71,7 +71,30 @@ const getUserInterviewAttempts = async (
   return attempts;
 };
 
+
+const initiateInterview = (interviewAgentId: number, userId: number) => {
+  return prisma.$transaction(async (tx) => {
+    // create interview container
+    const interview = await tx.interview.create({
+      data: {}
+    }); 
+    // create interview session
+    const session = await tx.candidateInterviewSession.create({
+      data: {
+        interviewAgentId,
+        interviewId: interview.id,
+        candidateId: userId,
+      }
+    });
+
+    return {
+      interviewId: interview.id,
+      sessionId: session.id
+    };
+  });
+}
 export default {
     getUserInterviewAttempts,
-    getDetailedInterviewResultBySession
+    getDetailedInterviewResultBySession,
+    initiateInterview,
 };

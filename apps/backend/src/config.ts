@@ -1,4 +1,3 @@
-
 import dotenv from 'dotenv';
 import { CookieOptions } from 'express';
 
@@ -18,7 +17,7 @@ export const tokenInfo = {
     issuer: process.env.TOKEN_ISSUER || '',
     audience: process.env.TOKEN_AUDIENCE || '',
     jwtPrivateKey: process.env.JWT_PRIVATE_KEY || '',
-    jwtPublicKey: process.env.JWT_PUBLIC_KEY || ''
+    jwtPublicKey: process.env.JWT_PUBLIC_KEY || '',
 };
 
 // Cookie options
@@ -27,20 +26,26 @@ const cookieDomain = process.env.COOKIE_DOMAIN;
 
 export const cookieOptions: CookieOptions = {
     httpOnly: true,
-    secure: isProduction, 
-    sameSite: isProduction ? 'none' as const : 'strict' as const,
+    secure: isProduction,
+    sameSite: isProduction ? ('none' as const) : ('strict' as const),
     maxAge: cookieMaxAgeSeconds,
     domain: isProduction ? cookieDomain : undefined,
-    path: '/'
-}
+    path: '/',
+};
 
 export const azureOpenAICred = {
     apiKey: process.env.OPENAI_API_KEY!,
     baseUrl: process.env.OPENAI_URL!,
     apiVersion: process.env.OPENAI_API_VERSION!,
-    deployment: process.env.OPENAI_MODEL!
+    deployment: process.env.OPENAI_MODEL!,
 };
 
+export const redisConfig = {
+    redisHost: process.env.REDIS_HOST || 'localhost',
+    redisPort: parseInt(process.env.REDIS_PORT || '6379'),
+    redisPassword: process.env.REDIS_PASSWORD,
+    redisTls: process.env.REDIS_TLS === 'true' || false,
+};
 export const logDirectory = process.env.LOG_DIRECTORY;
 
-export const dbUrl = process.env.DATABASE_URL ?? "";
+export const dbUrl = process.env.DATABASE_URL ?? '';

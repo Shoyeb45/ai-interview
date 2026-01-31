@@ -1,8 +1,9 @@
 "use client";
 import { useRef, useState, useEffect } from "react";
-import { Mic, MicOff, Volume2 } from "lucide-react";
+import { Mic, MicOff, Volume2, Briefcase, Building2, Clock, User } from "lucide-react";
 import { envVar } from "@/lib/config";
 import { toast } from "sonner";
+import type { InterviewContext } from "@/lib/interviewApi";
 
 interface Message {
   role: "user" | "assistant";
@@ -10,7 +11,12 @@ interface Message {
   timestamp: Date;
 }
 
-export default function VoiceChat() {
+interface VoiceChatProps {
+  interviewId?: string;
+  context?: InterviewContext | null;
+}
+
+export default function VoiceChat({ context }: VoiceChatProps = {}) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -73,7 +79,7 @@ export default function VoiceChat() {
     unmuteMicrophone();
   };
 
-  // Monitor audio playback
+  // Monitor audio playback (listeners use clearAISpeaking; intentionally run once on mount)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -125,6 +131,7 @@ export default function VoiceChat() {
       audio.removeEventListener("timeupdate", handleTimeUpdate);
       audio.removeEventListener("error", handleError);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- audio listeners; clearAISpeaking is stable enough
   }, []);
 
   const initialiseConnection = async () => {
@@ -388,151 +395,215 @@ export default function VoiceChat() {
     }
   };
 
+  const title = context?.title ?? "Interview";
+  const role = context?.role;
+  const companyName = context?.companyName;
+  const hiringManagerName = context?.hiringManagerName;
+  const totalQuestions = context?.totalQuestions;
+  const estimatedDuration = context?.estimatedDuration;
+  const focusAreas = context?.focusAreas ?? [];
+
   return (
-    <div className="flex h-full min-h-screen w-full bg-gray-50">
+    <div className="flex h-full min-h-screen w-full bg-slate-50">
       <audio ref={audioRef} autoPlay playsInline style={{ display: "none" }} />
 
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="bg-white border-b px-6 py-4 shadow-sm">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Interview</h1>
-              <p className="text-sm text-gray-500 mt-1">
-                {isConnected ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    Connected - Natural conversation mode
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
-                    Not connected
-                  </span>
+        {/* Interview header: title, role, context from previous page */}
+        <header className="bg-white border-b border-slate-200/80 shadow-sm">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate">
+                  {title}
+                </h1>
+                {role && (
+                  <p className="text-slate-600 mt-0.5 flex items-center gap-1.5">
+                    <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
+                    <span>{role}</span>
+                  </p>
                 )}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {!isConnected ? (
-                <button
-                  onClick={initialiseConnection}
-                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                >
-                  Start Interview
-                </button>
-              ) : (
-                <button
-                  onClick={disconnect}
-                  className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium"
-                >
-                  End Interview
-                </button>
-              )}
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                  {companyName && (
+                    <span className="inline-flex items-center gap-1">
+                      <Building2 className="h-3.5 w-3.5" />
+                      {companyName}
+                    </span>
+                  )}
+                  {hiringManagerName && (
+                    <span className="inline-flex items-center gap-1">
+                      <User className="h-3.5 w-3.5" />
+                      {hiringManagerName}
+                    </span>
+                  )}
+                  {estimatedDuration != null && (
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      ~{estimatedDuration} min
+                      {totalQuestions != null && ` · ${totalQuestions} questions`}
+                    </span>
+                  )}
+                  {focusAreas.length > 0 && (
+                    <span className="flex flex-wrap gap-1">
+                      {focusAreas.slice(0, 3).map((area) => (
+                        <span
+                          key={area}
+                          className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"
+                        >
+                          {area}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 text-sm">
+                  {isConnected ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-slate-600 font-medium">Live</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-slate-300" />
+                      <span className="text-slate-500">Not connected</span>
+                    </>
+                  )}
+                </div>
+                {!isConnected ? (
+                  <button
+                    onClick={initialiseConnection}
+                    className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Start interview
+                  </button>
+                ) : (
+                  <button
+                    onClick={disconnect}
+                    className="px-5 py-2.5 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors border border-slate-200"
+                  >
+                    End interview
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="max-w-4xl mx-auto space-y-4">
+        {/* Conversation area — interview feel */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             {messages.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-                  <Mic className="w-8 h-8 text-blue-500" />
+              <div className="text-center py-16">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 border border-blue-100 mb-6">
+                  <Mic className="w-10 h-10 text-blue-500" />
                 </div>
-                <p className="text-gray-500 text-lg">
-                  Start speaking to begin the conversation
+                <h2 className="text-lg font-semibold text-slate-800">
+                  Your interview is ready
+                </h2>
+                <p className="text-slate-500 mt-2 max-w-sm mx-auto">
+                  Click &quot;Start interview&quot; and allow microphone access. Speak naturally when the interviewer asks you a question.
                 </p>
-                <p className="text-gray-400 text-sm mt-2">
-                  Click &quot;Start Interview&quot; and allow microphone access
-                </p>
-                <p className="text-gray-400 text-xs mt-4 max-w-md mx-auto">
-                  💡 The microphone will automatically mute when the AI is speaking to prevent echo
+                <p className="text-slate-400 text-sm mt-6 max-w-md mx-auto">
+                  Your mic will mute automatically while the interviewer is speaking to avoid echo.
                 </p>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    message.role === "user" ? "justify-end" : "justify-start"
-                  }`}
-                >
+              <div className="space-y-6">
+                {messages.map((message, index) => (
                   <div
-                    className={`max-w-2xl px-4 py-3 rounded-2xl ${
-                      message.role === "user"
-                        ? "bg-blue-500 text-white"
-                        : "bg-white text-gray-800 border border-gray-200"
+                    key={index}
+                    className={`flex ${
+                      message.role === "user" ? "justify-end" : "justify-start"
                     }`}
                   >
-                    <p className="text-sm font-medium mb-1 opacity-70">
-                      {message.role === "user" ? "You" : "Interviewer"}
-                    </p>
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                    <p
-                      className={`text-xs mt-2 ${
-                        message.role === "user" ? "text-blue-100" : "text-gray-400"
+                    <div
+                      className={`max-w-[85%] sm:max-w-xl px-4 py-3 rounded-2xl ${
+                        message.role === "user"
+                          ? "bg-blue-600 text-white rounded-br-md"
+                          : "bg-white text-slate-800 border border-slate-200 rounded-bl-md shadow-sm"
                       }`}
                     >
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
+                      <p className="text-xs font-semibold uppercase tracking-wider opacity-80 mb-1.5">
+                        {message.role === "user" ? "You" : "Interviewer"}
+                      </p>
+                      <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
+                        {message.content}
+                      </p>
+                      <p
+                        className={`text-xs mt-2 ${
+                          message.role === "user"
+                            ? "text-blue-100"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {message.timestamp.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))}
 
-            {currentTranscript && (
-              <div className="flex justify-end">
-                <div className="max-w-2xl px-4 py-3 rounded-2xl bg-blue-400 text-white opacity-70">
-                  <p className="text-sm font-medium mb-1">You (speaking...)</p>
-                  <p className="whitespace-pre-wrap italic">{currentTranscript}</p>
-                </div>
+                {currentTranscript && (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] sm:max-w-xl px-4 py-3 rounded-2xl rounded-br-md bg-blue-500/90 text-white">
+                      <p className="text-xs font-semibold uppercase tracking-wider opacity-90 mb-1">
+                        You (speaking…)
+                      </p>
+                      <p className="whitespace-pre-wrap italic text-[15px]">
+                        {currentTranscript}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
-        </div>
+        </main>
 
-        {/* Microphone Control */}
+        {/* Microphone control — fixed at bottom when connected */}
         {isConnected && (
-          <div className="bg-white border-t px-6 py-4">
-            <div className="max-w-4xl mx-auto flex items-center justify-center gap-6">
+          <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 py-5">
+            <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
               <button
                 onClick={toggleListening}
                 disabled={isAISpeaking}
-                className={`p-6 rounded-full transition-all transform ${
+                className={`p-5 rounded-full transition-all duration-200 ${
                   isAISpeaking
-                    ? "bg-gray-200 cursor-not-allowed"
+                    ? "bg-slate-200 cursor-not-allowed"
                     : isListening
-                    ? "bg-blue-500 hover:bg-blue-600 shadow-lg hover:scale-105"
-                    : "bg-gray-300 hover:bg-gray-400 hover:scale-105"
+                    ? "bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/25 hover:scale-105"
+                    : "bg-slate-200 hover:bg-slate-300 hover:scale-105"
                 }`}
+                aria-label={isListening ? "Mute microphone" : "Unmute microphone"}
               >
                 {isListening ? (
                   <Mic className="w-8 h-8 text-white" />
                 ) : (
-                  <MicOff className="w-8 h-8 text-gray-600" />
+                  <MicOff className="w-8 h-8 text-slate-600" />
                 )}
               </button>
-              
-              <div className="flex flex-col gap-1">
-                <p className="text-gray-600 font-medium">
+              <div className="text-center sm:text-left">
+                <p className="text-slate-700 font-medium">
                   {isAISpeaking
-                    ? "Listening paused - AI is speaking"
+                    ? "Interviewer is speaking…"
                     : isListening
-                    ? "Listening..."
-                    : "Microphone muted"}
+                    ? "You’re live — speak when ready"
+                    : "Microphone off — click to unmute"}
                 </p>
                 {isAISpeaking && (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <Volume2 className="w-5 h-5 animate-pulse" />
-                    <span className="text-sm font-medium">AI is speaking</span>
+                  <div className="flex items-center justify-center sm:justify-start gap-2 text-blue-600 mt-1">
+                    <Volume2 className="w-4 h-4 animate-pulse" />
+                    <span className="text-sm font-medium">Listening to response</span>
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </footer>
         )}
       </div>
     </div>
