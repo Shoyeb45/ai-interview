@@ -21,10 +21,21 @@ model User {
 
   roles            UserRoleRelation[]
   keystores        Keystore[]
-  interviews       Interview[]
+  interviewAgents       InterviewAgent[]
   interviewResults InterviewResult[]
-
+  hiringManagerInformation HiringManagerInformation[]
   @@index([email])
+}
+
+model HiringManagerInformation {
+  id Int     @id @default(autoincrement())
+  hiringManagerId Int
+  companyName String 
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  hiringManager User @relation(fields: [hiringManagerId], references: [id], onDelete: Cascade)
+  @@index([hiringManagerId])
 }
 
 // Many to Many join table for assigning multiple role to one user
@@ -59,7 +70,7 @@ model Role {
 
 enum RoleCode {
   USER
-  ADMIN
+  HIRING_MANAGER
 }
 
 // Keystore Table for JWT token management
@@ -106,9 +117,9 @@ enum Permission {
 // INTERVIEW SYSTEM
 // ============================================
 
-model Interview {
+model InterviewAgent {
   id     Int    @id @default(autoincrement())
-  userId Int    @map("user_id")
+  createdById Int    @map("user_id")
   title  String // e.g., "Backend Developer Interview"
 
   // Interview Configuration
@@ -127,16 +138,21 @@ model Interview {
   startedAt     DateTime?       @map("started_at")
   completedAt   DateTime?       @map("completed_at")
   
+  isActive Boolean @map("is_active") @default(true)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversations    Conversation[]
-  result           InterviewResult?
+  createdBy             User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
   
-  @@index([userId])
+  @@index([createdById])
   @@index([status])
-  @@index([userId, status])
+  @@index([createdById, status])
+}
+
+model Interview {
+  id Int @id @default(autoincrement())
+
 }
 
 enum ExperienceLevel {
