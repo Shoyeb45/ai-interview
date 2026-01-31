@@ -1,3 +1,4 @@
+
 import dotenv from 'dotenv';
 import { CookieOptions } from 'express';
 
@@ -32,6 +33,13 @@ export const cookieOptions: CookieOptions = {
     domain: isProduction ? cookieDomain : undefined,
     path: '/'
 }
+
+export const azureOpenAICred = {
+    apiKey: process.env.OPENAI_API_KEY!,
+    baseUrl: process.env.OPENAI_URL!,
+    apiVersion: process.env.OPENAI_API_VERSION!,
+    deployment: process.env.OPENAI_MODEL!
+};
 
 export const logDirectory = process.env.LOG_DIRECTORY;
 

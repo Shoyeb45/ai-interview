@@ -6,6 +6,12 @@ export type CompanySize = "STARTUP" | "SMALL" | "MEDIUM" | "LARGE" | "ENTERPRISE
 
 export type InterviewAgentStatus = "DRAFT" | "PUBLISHED" | "PAUSED" | "CLOSED" | "ARCHIVED";
 
+export type QuestionSelectionMode = "CUSTOM_ONLY" | "AI_ONLY" | "MIXED";
+
+export type QuestionCategory = "TECHNICAL" | "BEHAVIORAL" | "CODING";
+
+export type DifficultyLevel = "EASY" | "MEDIUM" | "HARD";
+
 export type ExperienceLevel =
   | "INTERN"
   | "ENTRY_LEVEL"
@@ -64,6 +70,7 @@ export interface InterviewAgent {
   role: string;
   jobDescription: string;
   experienceLevel: ExperienceLevel;
+  questionSelectionMode?: QuestionSelectionMode;
   totalQuestions: number;
   estimatedDuration: number;
   focusAreas: string[];
@@ -80,6 +87,24 @@ export interface InterviewAgent {
   /** Populated when listing for candidates (hiring manager name & company) */
   createdBy?: { name: string };
   companyName?: string;
+  questions?: InterviewQuestion[];
+}
+
+export interface InterviewQuestion {
+  id: number;
+  interviewAgentId: number;
+  questionText: string;
+  category: QuestionCategory;
+  difficulty: DifficultyLevel;
+  orderIndex: number;
+  estimatedTime: number;
+  isActive: boolean;
+  expectedKeywords: string[];
+  gradingRubric?: Record<string, unknown> | null;
+  sampleAnswer?: string | null;
+  focusAreas: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** Minimal candidate info for leaderboard / HM views */

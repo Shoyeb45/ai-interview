@@ -1,16 +1,34 @@
+import { InterviewAgentStatus } from '@prisma/client';
 import { prisma } from '..';
 import { InterviewAgentSchema } from '../../routes/interview-agent/schema';
+import _ from 'lodash';
+
 
 const create = async (
     data: InterviewAgentSchema['CreateInterviewAgent'],
     userId: number,
 ) => {
-    return await prisma.interviewAgent.create({
-        data: {
-            createdById: userId,
-            ...data,
-        },
+    return await prisma.$transaction(async (tx) => {
+        const interviewAgent = await tx.interviewAgent.create({
+            data: {
+                createdById: userId,
+                ..._.omit(data, ['questions']),
+            },
+        });
+
+        const questions = await  data.questions.map(ques => ({
+            interviewAgentId: interviewAgent.id,
+            ...ques
+        }));
+
+        tx.interviewQuestion.createMany({
+            data: questions
+        });
+
+        return interviewAgent;
     });
+
+    
 };
 
 const getInterviewAgentsByHiringManagerId = async (createdById: number) =>
@@ -72,8 +90,45 @@ const getInterviewAgentDetailById = async (id: number, userId?: number) =>
         },
     });
 
+const getAvailableInterviews = async () =>
+    await prisma.interviewAgent.findMany({
+        where: {
+            isActive: true,
+            status: InterviewAgentStatus.PUBLISHED,
+        },
+        select: {
+            id: true,
+            title: true,
+            totalQuestions: true,
+            estimatedDuration: true,
+            createdBy: {
+                select: {
+                    id: true,
+                    name: true,
+                    hiringManagerInformation: {
+                        select: {
+                            companyName: true,
+                        },
+                    },
+                },
+            },
+        },
+    });
+
+const softDelete = async (id: number) => 
+    await prisma.interviewAgent.update({
+        where: {
+            id
+        },
+        data: {
+            isActive: false
+        }
+    });
+
 export default {
     create,
     getInterviewAgentsByHiringManagerId,
-    getInterviewAgentDetailById
+    getInterviewAgentDetailById,
+    getAvailableInterviews,
+    softDelete,
 };

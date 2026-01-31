@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { createInterviewAgent } from "@/lib/mockApi";
+import { createInterviewAgent, createQuestion } from "@/lib/mockApi";
 import type { ExperienceLevel, InterviewAgentStatus } from "@/types/schema";
+import type { InterviewQuestion, QuestionSelectionMode } from "@/types/schema";
+import AgentQuestionsSection from "@/components/AgentQuestionsSection";
 import { toast } from "sonner";
 
 const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
@@ -37,6 +39,7 @@ export default function NewAgentPage() {
     role: "",
     jobDescription: "",
     experienceLevel: "MID_LEVEL" as ExperienceLevel,
+    questionSelectionMode: "MIXED" as QuestionSelectionMode,
     totalQuestions: 6,
     estimatedDuration: 30,
     focusAreas: [] as string[],
@@ -45,6 +48,7 @@ export default function NewAgentPage() {
     deadline: "",
     status: "DRAFT" as InterviewAgentStatus,
   });
+  const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
 
   const toggleFocus = (area: string) => {
     setForm((f) => ({
@@ -64,6 +68,7 @@ export default function NewAgentPage() {
         role: form.role,
         jobDescription: form.jobDescription,
         experienceLevel: form.experienceLevel,
+        questionSelectionMode: form.questionSelectionMode,
         totalQuestions: form.totalQuestions,
         estimatedDuration: form.estimatedDuration,
         focusAreas: form.focusAreas,
@@ -72,6 +77,18 @@ export default function NewAgentPage() {
         deadline: form.deadline || null,
         status: form.status,
       });
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        await createQuestion(agent.id, {
+          questionText: q.questionText,
+          category: q.category,
+          difficulty: q.difficulty,
+          orderIndex: q.orderIndex,
+          estimatedTime: q.estimatedTime,
+          expectedKeywords: q.expectedKeywords ?? [],
+          focusAreas: q.focusAreas ?? [],
+        });
+      }
       toast.success("Interview agent created");
       router.push(`/dashboard/hiring-manager/agents/${agent.id}`);
     } catch {
@@ -185,6 +202,26 @@ export default function NewAgentPage() {
             ))}
           </div>
         </div>
+
+        <div className="border-t border-gray-200 pt-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Questions</h2>
+          <AgentQuestionsSection
+            agentId={null}
+            formDetails={{
+              title: form.title,
+              role: form.role,
+              jobDescription: form.jobDescription,
+              experienceLevel: form.experienceLevel,
+              focusAreas: form.focusAreas,
+              totalQuestions: form.totalQuestions,
+            }}
+            questionSelectionMode={form.questionSelectionMode}
+            onQuestionSelectionModeChange={(mode) => setForm((f) => ({ ...f, questionSelectionMode: mode }))}
+            questions={questions}
+            onQuestionsChange={setQuestions}
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Max candidates</label>

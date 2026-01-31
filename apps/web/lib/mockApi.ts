@@ -7,12 +7,16 @@ import type {
   User,
   HiringManagerInformation,
   InterviewAgent,
+  InterviewQuestion,
   CandidateInterviewSession,
   InterviewResult,
   UserMetrics,
   CompanySize,
   ExperienceLevel,
   InterviewAgentStatus,
+  QuestionSelectionMode,
+  QuestionCategory,
+  DifficultyLevel,
 } from "@/types/schema";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -99,6 +103,7 @@ const mockAgents: InterviewAgent[] = [
     role: "Software Engineer",
     jobDescription: "Build scalable APIs and services.",
     experienceLevel: "MID_LEVEL",
+    questionSelectionMode: "MIXED",
     totalQuestions: 6,
     estimatedDuration: 30,
     focusAreas: ["algorithms", "system design", "databases"],
@@ -120,6 +125,7 @@ const mockAgents: InterviewAgent[] = [
     role: "Frontend Engineer",
     jobDescription: "React, TypeScript, and UI performance.",
     experienceLevel: "SENIOR",
+    questionSelectionMode: "MIXED",
     totalQuestions: 5,
     estimatedDuration: 25,
     focusAreas: ["web development", "apis", "testing"],
@@ -136,6 +142,51 @@ const mockAgents: InterviewAgent[] = [
   },
 ];
 
+// ─── Interview Questions (per agent) ─────────────────────────────────────────
+
+const mockQuestionsByAgent: Map<number, InterviewQuestion[]> = new Map([
+  [
+    1,
+    [
+      {
+        id: 101,
+        interviewAgentId: 1,
+        questionText: "Explain the difference between REST and GraphQL. When would you choose one over the other?",
+        category: "TECHNICAL",
+        difficulty: "MEDIUM",
+        orderIndex: 1,
+        estimatedTime: 5,
+        isActive: true,
+        expectedKeywords: ["REST", "GraphQL", "API", "endpoints"],
+        focusAreas: ["apis"],
+      },
+      {
+        id: 102,
+        interviewAgentId: 1,
+        questionText: "Describe how you would design a rate-limiting system for an API.",
+        category: "TECHNICAL",
+        difficulty: "HARD",
+        orderIndex: 2,
+        estimatedTime: 5,
+        isActive: true,
+        expectedKeywords: ["rate limit", "token bucket", "sliding window"],
+        focusAreas: ["system design", "apis"],
+      },
+    ],
+  ],
+  [2, []],
+]);
+
+function getNextQuestionId(): number {
+  let max = 0;
+  mockQuestionsByAgent.forEach((list) => {
+    list.forEach((q) => {
+      if (q.id > max) max = q.id;
+    });
+  });
+  return max + 1;
+}
+
 export async function getInterviewAgents(): Promise<InterviewAgent[]> {
   await delay(350);
   return [...mockAgents];
@@ -143,7 +194,168 @@ export async function getInterviewAgents(): Promise<InterviewAgent[]> {
 
 export async function getInterviewAgentById(id: number): Promise<InterviewAgent | null> {
   await delay(200);
-  return mockAgents.find((a) => a.id === id) ?? null;
+  const agent = mockAgents.find((a) => a.id === id) ?? null;
+  if (agent) {
+    const questions = mockQuestionsByAgent.get(agent.id) ?? [];
+    return { ...agent, questions: [...questions].sort((a, b) => a.orderIndex - b.orderIndex) };
+  }
+  return null;
+}
+
+export async function getQuestionsByAgentId(agentId: number): Promise<InterviewQuestion[]> {
+  await delay(200);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  return [...list].sort((a, b) => a.orderIndex - b.orderIndex);
+}
+
+export async function createQuestion(
+  agentId: number,
+  data: {
+    questionText: string;
+    category: QuestionCategory;
+    difficulty: DifficultyLevel;
+    orderIndex: number;
+    estimatedTime?: number;
+    expectedKeywords?: string[];
+    focusAreas?: string[];
+    sampleAnswer?: string | null;
+  }
+): Promise<InterviewQuestion> {
+  await delay(300);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  const nextId = getNextQuestionId();
+  const q: InterviewQuestion = {
+    id: nextId,
+    interviewAgentId: agentId,
+    questionText: data.questionText,
+    category: data.category,
+    difficulty: data.difficulty,
+    orderIndex: data.orderIndex,
+    estimatedTime: data.estimatedTime ?? 5,
+    isActive: true,
+    expectedKeywords: data.expectedKeywords ?? [],
+    focusAreas: data.focusAreas ?? [],
+    sampleAnswer: data.sampleAnswer ?? null,
+  };
+  list.push(q);
+  mockQuestionsByAgent.set(agentId, list);
+  return q;
+}
+
+export async function updateQuestion(
+  agentId: number,
+  questionId: number,
+  data: Partial<InterviewQuestion>
+): Promise<InterviewQuestion> {
+  await delay(300);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  const idx = list.findIndex((q) => q.id === questionId);
+  if (idx === -1) throw new Error("Question not found");
+  list[idx] = { ...list[idx], ...data, id: questionId, interviewAgentId: agentId };
+  return list[idx];
+}
+
+export async function deleteQuestion(agentId: number, questionId: number): Promise<void> {
+  await delay(200);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  const filtered = list.filter((q) => q.id !== questionId);
+  mockQuestionsByAgent.set(agentId, filtered);
+}
+
+/** Generate questions using AI based on agent details. Requires title, role, jobDescription, experienceLevel, focusAreas, totalQuestions to be filled. */
+export async function generateQuestionsByAI(
+  agentOrDetails: InterviewAgent | {
+    title: string;
+    role: string;
+    jobDescription: string;
+    experienceLevel: string;
+    focusAreas: string[];
+    totalQuestions: number;
+  }
+): Promise<InterviewQuestion[]> {
+  await delay(800);
+  const title = agentOrDetails.title?.trim() ?? "";
+  const role = agentOrDetails.role?.trim() ?? "";
+  const jobDescription = agentOrDetails.jobDescription?.trim() ?? "";
+  const experienceLevel = agentOrDetails.experienceLevel ?? "";
+  const focusAreas = agentOrDetails.focusAreas ?? [];
+  const totalQuestions = agentOrDetails.totalQuestions ?? 0;
+  if (!title || !role || !jobDescription || !experienceLevel || focusAreas.length === 0 || totalQuestions < 1) {
+    throw new Error(
+      "Fill in title, role, job description, experience level, at least one focus area, and total questions before generating questions."
+    );
+  }
+  const agentId = "id" in agentOrDetails ? (agentOrDetails as InterviewAgent).id : 0;
+  const existing = agentId ? (mockQuestionsByAgent.get(agentId) ?? []) : [];
+  const nextOrder = existing.length + 1;
+  const count = Math.min(totalQuestions, 5);
+  const baseQuestions: Omit<InterviewQuestion, "id">[] = [
+    {
+      interviewAgentId: agentId,
+      questionText: `Describe your experience with ${role} and how you approach ${focusAreas[0] ?? "technical"} challenges.`,
+      category: "TECHNICAL",
+      difficulty: "MEDIUM",
+      orderIndex: nextOrder,
+      estimatedTime: 5,
+      isActive: true,
+      expectedKeywords: [],
+      focusAreas: [...focusAreas].slice(0, 2),
+    },
+    {
+      interviewAgentId: agentId,
+      questionText: `Explain a time when you had to debug a complex issue in a production system. What was your process?`,
+      category: "BEHAVIORAL",
+      difficulty: "MEDIUM",
+      orderIndex: nextOrder + 1,
+      estimatedTime: 5,
+      isActive: true,
+      expectedKeywords: ["debug", "production", "process"],
+      focusAreas: [],
+    },
+    {
+      interviewAgentId: agentId,
+      questionText: `How would you design a scalable solution for ${focusAreas[0] ?? "the main domain"}? Walk through your approach.`,
+      category: "TECHNICAL",
+      difficulty: "HARD",
+      orderIndex: nextOrder + 2,
+      estimatedTime: 5,
+      isActive: true,
+      expectedKeywords: ["scalable", "design"],
+      focusAreas: [...focusAreas].slice(0, 2),
+    },
+    {
+      interviewAgentId: agentId,
+      questionText: `What are the key trade-offs between consistency and availability in distributed systems?`,
+      category: "TECHNICAL",
+      difficulty: "HARD",
+      orderIndex: nextOrder + 3,
+      estimatedTime: 5,
+      isActive: true,
+      expectedKeywords: ["CAP", "consistency", "availability"],
+      focusAreas: ["system design"],
+    },
+    {
+      interviewAgentId: agentId,
+      questionText: `Tell us about a project where you collaborated with non-technical stakeholders. How did you communicate technical decisions?`,
+      category: "BEHAVIORAL",
+      difficulty: "EASY",
+      orderIndex: nextOrder + 4,
+      estimatedTime: 5,
+      isActive: true,
+      expectedKeywords: ["communication", "stakeholders"],
+      focusAreas: [],
+    },
+  ];
+  const startId = agentId ? getNextQuestionId() : 0;
+  const toAdd = baseQuestions.slice(0, count).map((q, i) => ({
+    ...q,
+    id: agentId ? startId + i : -(i + 1),
+  })) as InterviewQuestion[];
+  if (agentId) {
+    const merged = [...existing, ...toAdd];
+    mockQuestionsByAgent.set(agentId, merged);
+  }
+  return toAdd;
 }
 
 export async function createInterviewAgent(data: {
@@ -151,6 +363,7 @@ export async function createInterviewAgent(data: {
   role: string;
   jobDescription: string;
   experienceLevel: ExperienceLevel;
+  questionSelectionMode?: QuestionSelectionMode;
   totalQuestions?: number;
   estimatedDuration?: number;
   focusAreas: string[];
@@ -167,6 +380,7 @@ export async function createInterviewAgent(data: {
     role: data.role,
     jobDescription: data.jobDescription,
     experienceLevel: data.experienceLevel,
+    questionSelectionMode: data.questionSelectionMode ?? "MIXED",
     totalQuestions: data.totalQuestions ?? 6,
     estimatedDuration: data.estimatedDuration ?? 30,
     focusAreas: data.focusAreas,
@@ -181,6 +395,7 @@ export async function createInterviewAgent(data: {
     updatedAt: new Date().toISOString(),
   };
   mockAgents.push(agent);
+  mockQuestionsByAgent.set(agent.id, []);
   return agent;
 }
 

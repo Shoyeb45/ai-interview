@@ -50,12 +50,8 @@ model HiringManagerInformation {
   // Contact & Visibility
   linkedinUrl     String?                   @map("linkedin_url")
   website         String?
-  // bio             String?                   @db.Text
 
   // Verification & Limits
-  // isVerified      Boolean                   @default(false) @map("is_verified")
-  // verifiedAt      DateTime?                 @map("verified_at")
-
   maxActiveInterviews Int                   @default(10) @map("max_active_interviews") // how many InterviewAgents can be active at once
 
   createdAt       DateTime                  @default(now()) @map("created_at")
@@ -146,7 +142,12 @@ model InterviewAgent {
   jobDescription  String          @map("job_description") @db.Text
   experienceLevel ExperienceLevel @map("experience_level")
 
-  // Question & Timing Settings
+  // Question Strategy
+  questionSelectionMode QuestionSelectionMode @default(MIXED) @map("question_selection_mode")
+  // CUSTOM_ONLY: use only hiring manager's custom questions
+  // AI_ONLY: generate all questions using AI based on job description
+  // MIXED: use custom questions + AI fills remaining slots
+  
   totalQuestions    Int      @default(6)  @map("total_questions")
   estimatedDuration Int      @default(30) @map("estimated_duration") // minutes
   focusAreas        String[] @map("focus_areas") // e.g. ["algorithms", "system design"]
@@ -167,6 +168,7 @@ model InterviewAgent {
 
   createdBy   User                       @relation(fields: [createdById], references: [id], onDelete: Cascade)
   sessions    CandidateInterviewSession[] // all candidate attempts against this agent
+  questions   InterviewQuestion[]         // custom questions defined by hiring manager
 
   @@index([createdById])
   @@index([isActive])
@@ -183,6 +185,12 @@ enum InterviewAgentStatus {
   ARCHIVED
 }
 
+enum QuestionSelectionMode {
+  CUSTOM_ONLY  // use only custom questions (totalQuestions must <= number of custom questions)
+  AI_ONLY      // AI generates all questions dynamically
+  MIXED        // use custom questions first, AI fills the rest
+}
+
 enum ExperienceLevel {
   INTERN
   ENTRY_LEVEL
@@ -193,6 +201,60 @@ enum ExperienceLevel {
   PRINCIPAL
 }
 
+// ============================================
+// CUSTOM INTERVIEW QUESTIONS
+// Questions created by hiring manager for their InterviewAgent
+// ============================================
+
+model InterviewQuestion {
+  id              Int    @id @default(autoincrement())
+  interviewAgentId Int   @map("interview_agent_id")
+
+  // Question Content
+  questionText    String          @map("question_text") @db.Text
+  category        QuestionCategory
+  difficulty      DifficultyLevel
+  
+  // Metadata
+  orderIndex      Int             @map("order_index")  // 1, 2, 3... for controlling question sequence
+  estimatedTime   Int             @default(5) @map("estimated_time") // minutes to answer
+  isActive        Boolean         @default(true) @map("is_active")   // allow disabling without deleting
+  
+  // Evaluation Criteria (for AI grading)
+  expectedKeywords String[]        @map("expected_keywords")        // e.g. ["async", "promise", "callback"]
+  gradingRubric    Json?           @map("grading_rubric")           
+  // {
+  //   "technical": { "weight": 40, "criteria": ["mentions async/await", "handles errors"] },
+  //   "communication": { "weight": 30, "criteria": ["clear explanation"] },
+  //   "problem_solving": { "weight": 30, "criteria": ["identifies edge cases"] }
+  // }
+  
+  // Reference answer (optional, for hiring manager's reference)
+  sampleAnswer    String?         @map("sample_answer") @db.Text
+  
+  // Focus areas this question tests
+  focusAreas      String[]        @map("focus_areas")  // e.g. ["concurrency", "error handling"]
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  interviewAgent InterviewAgent @relation(fields: [interviewAgentId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewAgentId, orderIndex]) // enforce unique ordering within an agent
+  @@index([interviewAgentId])
+  @@index([interviewAgentId, isActive])
+  @@index([category])
+  @@index([difficulty])
+}
+
+enum QuestionCategory {
+  TECHNICAL       // coding, algorithms, system design
+  BEHAVIORAL      // past experience, situational
+  PROBLEM_SOLVING // case studies, brain teasers
+  DOMAIN_KNOWLEDGE // role-specific knowledge (e.g. ML, databases)
+  CULTURAL_FIT    // values, working style
+  CODING          // live coding challenge
+}
 
 // ============================================
 // CANDIDATE SESSION
@@ -264,6 +326,10 @@ model Conversation {
   question        String          @db.Text
   category        String?         // "technical", "behavioral", "coding"
   difficulty      DifficultyLevel?
+  
+  // NEW: Track question source
+  questionSource  QuestionSource  @default(AI_GENERATED) @map("question_source")
+  interviewQuestionId Int?        @map("interview_question_id") // null if AI-generated, set if from InterviewQuestion
 
   answer          String?         @db.Text
 
@@ -290,6 +356,12 @@ model Conversation {
 
   @@index([interviewId])
   @@index([interviewId, questionNumber])
+  @@index([interviewQuestionId])
+}
+
+enum QuestionSource {
+  CUSTOM          // from InterviewQuestion created by hiring manager
+  AI_GENERATED    // dynamically generated by AI
 }
 
 enum DifficultyLevel {

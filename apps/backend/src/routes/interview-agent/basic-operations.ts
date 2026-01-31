@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authorize } from '../../middlewares/authorize.middleware';
-import { RoleCode } from '@prisma/client';
+import { QuestionSelectionMode, RoleCode } from '@prisma/client';
 import { asyncHandler } from '../../core/asyncHandler';
 import { ProtectedRequest } from '../../types/app-requests';
 import { validator } from '../../middlewares/validator.middleware';
@@ -12,19 +12,22 @@ import { BadRequestError } from '../../core/ApiError';
 
 const router = Router();
 
-router.use(authorize(RoleCode.HIRING_MANAGER));
-
 router.post(
     '/',
+    authorize(RoleCode.HIRING_MANAGER),
     validator(schema.createInterviewAgent, ValidationSource.BODY),
     asyncHandler<ProtectedRequest>(async (req, res) => {
         const data = req.body as InterviewAgentSchema['CreateInterviewAgent'];
         const userId = req.user.id;
 
+        if (data.questionSelectionMode === QuestionSelectionMode.CUSTOM_ONLY && data.questions.length !== data.totalQuestions) 
+            throw new BadRequestError('Please provide valid number of questions.');
+
         const createdInterviewAgent = await interviewAgentRepo.create(
             data,
             userId,
         );
+        
 
         new SuccessResponse(
             'Interview Agent Created.',
@@ -35,6 +38,7 @@ router.post(
 
 router.get(
     '/',
+    authorize(RoleCode.HIRING_MANAGER),
     asyncHandler<ProtectedRequest>(async (req, res) => {
         const interviewAgents =
             await interviewAgentRepo.getInterviewAgentsByHiringManagerId(
@@ -49,6 +53,7 @@ router.get(
 
 router.get(
     '/:interviewAgentId',
+    authorize(RoleCode.HIRING_MANAGER, RoleCode.USER),
     asyncHandler<ProtectedRequest>(async (req, res) => {
         const interviewAgentId = Number(req.params.interviewAgentId);
         const agent = await interviewAgentRepo.getInterviewAgentDetailById(
@@ -67,6 +72,5 @@ router.get(
         }).send(res);
     }),
 );
-
 
 export default router;
