@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 import wave
 from fastapi import WebSocket
 import numpy as np
@@ -9,6 +9,8 @@ from src.constant import AUDIO_FREQ, ENERGY_THRESHOLD
 from urllib.parse import parse_qs, urlparse
 from webrtcvad import Vad
 import os
+import jwt
+from jwt import PyJWTError
 from pydub import AudioSegment
 
 
@@ -61,10 +63,17 @@ async def send_over_ws(ws: WebSocket, value: Dict[str, Any]):
         print(e)
 
 
-def get_token(url: str):
+def get_token_and_session(url: str) -> tuple[Union[str, None], Union[str, None]]:
+    """Parse token and sessionId from WebSocket URL query. Returns (token, session_id) or (None, None) if missing."""
     parsed_url = urlparse(url)
-    token = parse_qs(parsed_url.query)['token'][0]
-    return token
+    query = parse_qs(parsed_url.query)
+    token = (query.get('token') or [None])[0]
+    session_id = (query.get('sessionId') or [None])[0]
+    if isinstance(token, str):
+        token = token.strip() if token else None
+    if isinstance(session_id, str):
+        session_id = session_id.strip() if session_id else None
+    return token, session_id
 
 
 
@@ -117,6 +126,28 @@ def upsample_16k_to_48k(pcm_16k: bytes) -> bytes:
     return audio_48k.raw_data
 
 
+def verify_jwt(access_token: str):
+    public_key = os.getenv("JWT_PUBLIC_KEY")
+
+    if not public_key:
+        raise ValueError("Please keep JWT_PUBLIC_KEY in environment")
+
+    try:
+        payload = jwt.decode(
+            access_token,
+            public_key,
+            algorithms=["RS256"],
+            options={
+                "verify_aud": False  # enable if you use audience
+            }
+        )
+        return payload  # decoded claims
+
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token has expired")
+
+    except jwt.InvalidTokenError:
+        raise ValueError("Invalid token")
 
 def setup_gcp_cred():
     cred_path = '/tmp/gcp-creds.json'

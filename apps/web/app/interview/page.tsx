@@ -2,21 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Briefcase, Clock, Play, ArrowLeft } from "lucide-react";
-import { getPublishedInterviewAgents, startSession } from "@/lib/mockApi";
+import { Briefcase, Clock, Building2, User, ArrowRight, ArrowLeft } from "lucide-react";
+import { getPublishedInterviewAgents } from "@/lib/mockApi";
 import type { InterviewAgent } from "@/types/schema";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppShell from "@/components/AppShell";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner";
 
 export default function InterviewListPage() {
-  const router = useRouter();
   const { isHiringManager } = useAuth();
   const [agents, setAgents] = useState<InterviewAgent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [startingId, setStartingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,18 +28,6 @@ export default function InterviewListPage() {
     load();
   }, [load]);
 
-  const handleStart = async (agentId: number) => {
-    setStartingId(agentId);
-    try {
-      const session = await startSession(agentId);
-      toast.success("Session started");
-      router.push(`/interview/${session.interviewId}/live`);
-    } catch {
-      toast.error("Failed to start session");
-      setStartingId(null);
-    }
-  };
-
   return (
     <ProtectedRoute>
       <AppShell>
@@ -57,7 +41,7 @@ export default function InterviewListPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Available Interviews</h1>
-            <p className="text-gray-600 mt-1">Choose an interview to start</p>
+            <p className="text-gray-600 mt-1">Choose an interview to view details and start</p>
           </div>
 
           {loading ? (
@@ -85,6 +69,22 @@ export default function InterviewListPage() {
                 >
                   <h2 className="font-semibold text-gray-900">{agent.title}</h2>
                   <p className="text-sm text-gray-500 mt-0.5">{agent.role}</p>
+                  {(agent.createdBy?.name || agent.companyName) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+                      {agent.createdBy?.name && (
+                        <span className="inline-flex items-center gap-1">
+                          <User className="h-4 w-4 text-gray-400" />
+                          {agent.createdBy.name}
+                        </span>
+                      )}
+                      {agent.companyName && (
+                        <span className="inline-flex items-center gap-1">
+                          <Building2 className="h-4 w-4 text-gray-400" />
+                          {agent.companyName}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
                     <Briefcase className="h-4 w-4" />
                     <span>{agent.totalQuestions} questions</span>
@@ -94,15 +94,13 @@ export default function InterviewListPage() {
                   </div>
                   <p className="mt-3 text-sm text-gray-600 line-clamp-2">{agent.jobDescription}</p>
                   <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => handleStart(agent.id)}
-                      disabled={startingId != null}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    <Link
+                      href={`/interview/start/${agent.id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
                     >
-                      <Play className="h-4 w-4" />
-                      {startingId === agent.id ? "Starting..." : "Start interview"}
-                    </button>
+                      View details & start
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
                   </div>
                 </div>
               ))}

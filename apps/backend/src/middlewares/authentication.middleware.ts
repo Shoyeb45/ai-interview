@@ -1,15 +1,15 @@
 import { Router } from 'express';
-import { validator } from '../../middlewares/validator.middleware';
-import schema from './schema';
-import { ValidationSource } from '../../helpers/validator';
-import { asyncHandler } from '../../core/asyncHandler';
-import { ProtectedRequest } from '../../types/app-requests';
-import { getAccessToken, validateTokenData } from '../../core/authUtils';
+import { validator } from './validator.middleware';
+import schema from '../routes/auth/schema';
+import { ValidationSource } from '../helpers/validator';
+import { asyncHandler } from '../core/asyncHandler';
+import { ProtectedRequest } from '../types/app-requests';
+import { getAccessToken, validateTokenData } from '../core/authUtils';
 import { TokenExpiredError } from 'jsonwebtoken';
-import { AccessTokenError, AuthFailureError } from '../../core/ApiError';
-import jwtUtils from '../../core/jwtUtils';
-import UserRepo from '../../database/repositories/UserRepo';
-import KeystoreRepo from '../../database/repositories/KeystoreRepo';
+import { AccessTokenError, AuthFailureError } from '../core/ApiError';
+import jwtUtils from '../core/jwtUtils';
+import UserRepo from '../database/repositories/UserRepo';
+import KeystoreRepo from '../database/repositories/KeystoreRepo';
 const router = Router();
 
 export default router.use(

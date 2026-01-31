@@ -22,12 +22,12 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  roles                     UserRoleRelation[]
-  keystores                 Keystore[]
-  interviewAgents           InterviewAgent[]           // interviews this user created (as hiring manager)
-  candidateSessions         CandidateInterviewSession[] // interviews this user has taken (as candidate)
-  interviewResults          InterviewResult[]
-  hiringManagerInformation  HiringManagerInformation?  // one-to-one profile
+  roles                    UserRoleRelation[]
+  keystores                Keystore[]
+  interviewAgents          InterviewAgent[] // interviews this user created (as hiring manager)
+  candidateSessions        CandidateInterviewSession[] // interviews this user has taken (as candidate)
+  interviewResults         InterviewResult[]
+  hiringManagerInformation HiringManagerInformation? // one-to-one profile
 
   @@index([email])
 }
@@ -37,31 +37,27 @@ model User {
 // ============================================
 
 model HiringManagerInformation {
-  id              Int    @id @default(autoincrement())
-  hiringManagerId Int    @unique @map("hiring_manager_id") // one-to-one with User
+  id              Int @id @default(autoincrement())
+  hiringManagerId Int @unique @map("hiring_manager_id") // one-to-one with User
 
   // Company & Role Context
-  companyName     String                    @map("company_name")
-  companySize     CompanySize               @map("company_size")
-  industry        String                    // e.g. "FinTech", "Healthcare"
-  department      String                    // e.g. "Engineering", "Product"
-  teamName        String?                   @map("team_name")
+  companyName String      @map("company_name")
+  companySize CompanySize @map("company_size")
+  industry    String // e.g. "FinTech", "Healthcare"
+  department  String // e.g. "Engineering", "Product"
+  teamName    String?     @map("team_name")
 
   // Contact & Visibility
-  linkedinUrl     String?                   @map("linkedin_url")
-  website         String?
-  // bio             String?                   @db.Text
+  linkedinUrl String? @map("linkedin_url")
+  website     String?
 
   // Verification & Limits
-  // isVerified      Boolean                   @default(false) @map("is_verified")
-  // verifiedAt      DateTime?                 @map("verified_at")
+  maxActiveInterviews Int @default(10) @map("max_active_interviews") // how many InterviewAgents can be active at once
 
-  maxActiveInterviews Int                   @default(10) @map("max_active_interviews") // how many InterviewAgents can be active at once
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  createdAt       DateTime                  @default(now()) @map("created_at")
-  updatedAt       DateTime                  @default(now()) @updatedAt @map("updated_at")
-
-  hiringManager   User                      @relation(fields: [hiringManagerId], references: [id], onDelete: Cascade)
+  hiringManager User @relation(fields: [hiringManagerId], references: [id], onDelete: Cascade)
 
   @@index([hiringManagerId])
   @@index([companyName])
@@ -69,11 +65,11 @@ model HiringManagerInformation {
 }
 
 enum CompanySize {
-  STARTUP        // 1–10
-  SMALL          // 11–50
-  MEDIUM         // 51–200
-  LARGE          // 201–1000
-  ENTERPRISE     // 1000+
+  STARTUP // 1–10
+  SMALL // 11–50
+  MEDIUM // 51–200
+  LARGE // 201–1000
+  ENTERPRISE // 1000+
 }
 
 // ============================================
@@ -83,7 +79,7 @@ enum CompanySize {
 model UserRoleRelation {
   id     Int @id @default(autoincrement())
   userId Int @map("user_id")
-  roleId  Int
+  roleId Int
 
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -137,24 +133,32 @@ model Keystore {
 // ============================================
 
 model InterviewAgent {
-  id            Int    @id @default(autoincrement())
-  createdById   Int    @map("created_by_id")
-  title         String // e.g. "Backend Developer Interview"
+  id          Int    @id @default(autoincrement())
+  createdById Int    @map("created_by_id")
+  title       String // e.g. "Backend Developer Interview"
 
   // Interview Definition
-  role            String          // e.g. "Software Engineer"
+  role            String // e.g. "Software Engineer"
   jobDescription  String          @map("job_description") @db.Text
   experienceLevel ExperienceLevel @map("experience_level")
 
-  // Question & Timing Settings
-  totalQuestions    Int      @default(6)  @map("total_questions")
+  // opening message 
+  openingMessage        String                @default("Hello,\nI hope you are fine, can you introduce yourself.")
+  
+  // Question Strategy
+  questionSelectionMode QuestionSelectionMode @default(MIXED) @map("question_selection_mode")
+  // CUSTOM_ONLY: use only hiring manager's custom questions
+  // AI_ONLY: generate all questions using AI based on job description
+  // MIXED: use custom questions + AI fills remaining slots
+
+  totalQuestions    Int      @default(6) @map("total_questions")
   estimatedDuration Int      @default(30) @map("estimated_duration") // minutes
   focusAreas        String[] @map("focus_areas") // e.g. ["algorithms", "system design"]
 
   // ── LIMITS (production controls) ──
-  maxCandidates     Int      @default(100) @map("max_candidates")     // max unique candidates allowed to attempt
-  maxAttemptsPerCandidate Int @default(3)  @map("max_attempts_per_candidate") // how many times one candidate can retry
-  deadline          DateTime?             // after this date no new sessions can start
+  maxCandidates           Int       @default(100) @map("max_candidates") // max unique candidates allowed to attempt
+  maxAttemptsPerCandidate Int       @default(3) @map("max_attempts_per_candidate") // how many times one candidate can retry
+  deadline                DateTime? @db.Timestamptz(6) // after this date no new sessions can start
 
   // Lifecycle
   status       InterviewAgentStatus @default(DRAFT)
@@ -165,8 +169,9 @@ model InterviewAgent {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  createdBy   User                       @relation(fields: [createdById], references: [id], onDelete: Cascade)
-  sessions    CandidateInterviewSession[] // all candidate attempts against this agent
+  createdBy User                        @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  sessions  CandidateInterviewSession[] // all candidate attempts against this agent
+  questions InterviewQuestion[] // custom questions defined by hiring manager
 
   @@index([createdById])
   @@index([isActive])
@@ -176,11 +181,17 @@ model InterviewAgent {
 }
 
 enum InterviewAgentStatus {
-  DRAFT       // hiring manager is still editing
-  PUBLISHED   // visible & open for candidates
-  PAUSED      // temporarily closed
-  CLOSED      // deadline passed or manually closed; no new sessions
+  DRAFT // hiring manager is still editing
+  PUBLISHED // visible & open for candidates
+  PAUSED // temporarily closed
+  CLOSED // deadline passed or manually closed; no new sessions
   ARCHIVED
+}
+
+enum QuestionSelectionMode {
+  CUSTOM_ONLY // use only custom questions (totalQuestions must <= number of custom questions)
+  AI_ONLY // AI generates all questions dynamically
+  MIXED // use custom questions first, AI fills the rest
 }
 
 enum ExperienceLevel {
@@ -193,6 +204,60 @@ enum ExperienceLevel {
   PRINCIPAL
 }
 
+// ============================================
+// CUSTOM INTERVIEW QUESTIONS
+// Questions created by hiring manager for their InterviewAgent
+// ============================================
+
+model InterviewQuestion {
+  id               Int @id @default(autoincrement())
+  interviewAgentId Int @map("interview_agent_id")
+
+  // Question Content
+  questionText String           @map("question_text") @db.Text
+  category     QuestionCategory
+  difficulty   DifficultyLevel
+
+  // Metadata
+  orderIndex    Int     @map("order_index") // 1, 2, 3... for controlling question sequence
+  estimatedTime Int     @default(5) @map("estimated_time") // minutes to answer
+  isActive      Boolean @default(true) @map("is_active") // allow disabling without deleting
+
+  // Evaluation Criteria (for AI grading)
+  expectedKeywords String[] @map("expected_keywords") // e.g. ["async", "promise", "callback"]
+  gradingRubric    Json?    @map("grading_rubric")
+  // {
+  //   "technical": { "weight": 40, "criteria": ["mentions async/await", "handles errors"] },
+  //   "communication": { "weight": 30, "criteria": ["clear explanation"] },
+  //   "problem_solving": { "weight": 30, "criteria": ["identifies edge cases"] }
+  // }
+
+  // Reference answer (optional, for hiring manager's reference)
+  sampleAnswer String? @map("sample_answer") @db.Text
+
+  // Focus areas this question tests
+  focusAreas String[] @map("focus_areas") // e.g. ["concurrency", "error handling"]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  interviewAgent InterviewAgent @relation(fields: [interviewAgentId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewAgentId, orderIndex]) // enforce unique ordering within an agent
+  @@index([interviewAgentId])
+  @@index([interviewAgentId, isActive])
+  @@index([category])
+  @@index([difficulty])
+}
+
+enum QuestionCategory {
+  TECHNICAL // coding, algorithms, system design
+  BEHAVIORAL // past experience, situational
+  PROBLEM_SOLVING // case studies, brain teasers
+  DOMAIN_KNOWLEDGE // role-specific knowledge (e.g. ML, databases)
+  CULTURAL_FIT // values, working style
+  CODING // live coding challenge
+}
 
 // ============================================
 // CANDIDATE SESSION
@@ -201,28 +266,28 @@ enum ExperienceLevel {
 // ============================================
 
 model CandidateInterviewSession {
-  id              Int    @id @default(autoincrement())
-  interviewAgentId Int   @map("interview_agent_id")
-  candidateId     Int    @map("candidate_id")
-  interviewId     Int    @map("interview_id") // the Interview row that holds conversations
+  id               Int @id @default(autoincrement())
+  interviewAgentId Int @map("interview_agent_id")
+  candidateId      Int @map("candidate_id")
+  interviewId      Int @map("interview_id") // the Interview row that holds conversations
 
   // Lifecycle
-  status          SessionStatus @default(PENDING)
-  startedAt       DateTime?     @map("started_at")
-  completedAt     DateTime?     @map("completed_at")
-  abandonedAt     DateTime?     @map("abandoned_at")
-  abandonReason  String?        @map("abandon_reason")
+  status        SessionStatus @default(PENDING)
+  startedAt     DateTime?     @map("started_at")
+  completedAt   DateTime?     @map("completed_at")
+  abandonedAt   DateTime?     @map("abandoned_at")
+  abandonReason String?       @map("abandon_reason")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  interviewAgent InterviewAgent   @relation(fields: [interviewAgentId], references: [id], onDelete: Cascade)
-  candidate      User             @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  interview      Interview        @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  interviewAgent InterviewAgent @relation(fields: [interviewAgentId], references: [id], onDelete: Cascade)
+  candidate      User           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  interview      Interview      @relation(fields: [interviewId], references: [id], onDelete: Cascade)
 
   // Results
   questionResults CandidateQuestionResult[] // per-question scores
-  overallResult   InterviewResult?          // single overall result
+  overallResult   InterviewResult? // single overall result
 
   @@unique([interviewAgentId, candidateId, interviewId]) // one row per attempt
   @@index([interviewAgentId])
@@ -232,64 +297,72 @@ model CandidateInterviewSession {
 }
 
 enum SessionStatus {
-  PENDING      // created but not yet started
-  IN_PROGRESS  // candidate is actively answering
-  COMPLETED    // finished normally
-  ABANDONED    // candidate left mid-way
-  CANCELLED    // cancelled before start (e.g. deadline passed)
+  PENDING // created but not yet started
+  IN_PROGRESS // candidate is actively answering
+  COMPLETED // finished normally
+  ABANDONED // candidate left mid-way
+  CANCELLED // cancelled before start (e.g. deadline passed)
 }
-
 
 // ============================================
 // INTERVIEW (container for conversations)
 // ============================================
 
 model Interview {
-  id            Int    @id @default(autoincrement())
+  id            Int                         @id @default(autoincrement())
   conversations Conversation[]
   results       InterviewResult[]
   session       CandidateInterviewSession[] // back-reference
 }
-
 
 // ============================================
 // CONVERSATION & MESSAGES
 // ============================================
 
 model Conversation {
-  id          Int    @id @default(autoincrement())
-  interviewId Int    @map("interview_id")
+  id          Int @id @default(autoincrement())
+  interviewId Int @map("interview_id")
 
-  questionNumber  Int             @map("question_number")
-  question        String          @db.Text
-  category        String?         // "technical", "behavioral", "coding"
-  difficulty      DifficultyLevel?
+  questionNumber Int              @map("question_number")
+  question       String           @db.Text
+  category       String? // "technical", "behavioral", "coding"
+  difficulty     DifficultyLevel?
 
-  answer          String?         @db.Text
+  // NEW: Track question source
+  questionSource      QuestionSource @default(AI_GENERATED) @map("question_source")
+  interviewQuestionId Int?           @map("interview_question_id") // null if AI-generated, set if from InterviewQuestion
+
+  answer String? @db.Text
 
   // Timing
-  questionAskedAt  DateTime        @map("question_asked_at")
-  answerStartedAt  DateTime?       @map("answer_started_at")
-  answerEndedAt    DateTime?       @map("answer_ended_at")
-  thinkingTime     Int?            @map("thinking_time")    // seconds
-  answerDuration   Int?            @map("answer_duration")  // seconds
+  questionAskedAt DateTime  @map("question_asked_at")
+  answerStartedAt DateTime? @map("answer_started_at")
+  answerEndedAt   DateTime? @map("answer_ended_at")
+  thinkingTime    Int?      @map("thinking_time") // seconds
+  answerDuration  Int?      @map("answer_duration") // seconds
 
   // Live Performance Indicators
-  strugglingIndicators Int   @default(0) @map("struggling_indicators")
-  confidenceScore      Float? @map("confidence_score")      // 0–1
-  clarificationsAsked  Int   @default(0) @map("clarifications_asked")
-  hintsProvided        Int   @default(0) @map("hints_provided")
+  strugglingIndicators Int    @default(0) @map("struggling_indicators")
+  confidenceScore      Float? @map("confidence_score") // 0–1
+  clarificationsAsked  Int    @default(0) @map("clarifications_asked")
+  hintsProvided        Int    @default(0) @map("hints_provided")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  interview       Interview              @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  messages        Message[]
-  feedback        QuestionFeedback?
-  questionResult  CandidateQuestionResult[] // structured per-question score
+  interview      Interview                 @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  messages       Message[]
+  feedback       QuestionFeedback?
+  questionResult CandidateQuestionResult[] // structured per-question score
 
   @@index([interviewId])
   @@index([interviewId, questionNumber])
+  @@index([interviewQuestionId])
+}
+
+enum QuestionSource {
+  CUSTOM // from InterviewQuestion created by hiring manager
+  AI_GENERATED // dynamically generated by AI
 }
 
 enum DifficultyLevel {
@@ -299,19 +372,19 @@ enum DifficultyLevel {
 }
 
 model Message {
-  id             Int         @id @default(autoincrement())
-  conversationId Int         @map("conversation_id")
+  id             Int @id @default(autoincrement())
+  conversationId Int @map("conversation_id")
 
   role      MessageRole
   content   String      @db.Text
   timestamp DateTime    @default(now())
 
   // Speech metrics
-  audioUrl    String?  @map("audio_url")
-  duration    Float?                    // seconds
-  wordsPerMin Float?   @map("words_per_min")
-  pauseCount  Int      @default(0) @map("pause_count")
-  fillerWords Int      @default(0) @map("filler_words")
+  audioUrl    String? @map("audio_url")
+  duration    Float? // seconds
+  wordsPerMin Float?  @map("words_per_min")
+  pauseCount  Int     @default(0) @map("pause_count")
+  fillerWords Int     @default(0) @map("filler_words")
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -327,7 +400,6 @@ enum MessageRole {
   SYSTEM
 }
 
-
 // ============================================
 // FEEDBACK & PER-QUESTION RESULTS
 // ============================================
@@ -337,10 +409,10 @@ model QuestionFeedback {
   id             Int @id @default(autoincrement())
   conversationId Int @unique @map("conversation_id")
 
-  answerQuality        Int    @map("answer_quality")         // 1–10
-  technicalAccuracy    Int    @map("technical_accuracy")     // 1–10
-  communicationClarity Int    @map("communication_clarity")  // 1–10
-  problemSolvingSkill  Int    @map("problem_solving_skill")  // 1–10
+  answerQuality        Int @map("answer_quality") // 1–10
+  technicalAccuracy    Int @map("technical_accuracy") // 1–10
+  communicationClarity Int @map("communication_clarity") // 1–10
+  problemSolvingSkill  Int @map("problem_solving_skill") // 1–10
 
   strengths   String[]
   weaknesses  String[]
@@ -362,26 +434,26 @@ model QuestionFeedback {
 
 // Structured numeric result per question, linked to the candidate session
 model CandidateQuestionResult {
-  id            Int @id @default(autoincrement())
-  sessionId     Int @map("session_id")       // which candidate session this belongs to
+  id             Int @id @default(autoincrement())
+  sessionId      Int @map("session_id") // which candidate session this belongs to
   conversationId Int @map("conversation_id") // which conversation (question) this scores
 
   questionNumber Int @map("question_number")
 
   // Scores (0–100 for easy aggregation)
-  overallQuestionScore     Int   @map("overall_question_score")
-  technicalScore           Int   @map("technical_score")
-  communicationScore       Int   @map("communication_score")
-  problemSolvingScore      Int   @map("problem_solving_score")
-  confidenceScore          Float @map("confidence_score")        // 0–1, mirrors live indicator
+  overallQuestionScore Int   @map("overall_question_score")
+  technicalScore       Int   @map("technical_score")
+  communicationScore   Int   @map("communication_score")
+  problemSolvingScore  Int   @map("problem_solving_score")
+  confidenceScore      Float @map("confidence_score") // 0–1, mirrors live indicator
 
   // Difficulty weighting (set at scoring time based on Conversation.difficulty)
-  difficultyWeight         Float @default(1.0) @map("difficulty_weight")
+  difficultyWeight Float @default(1.0) @map("difficulty_weight")
   // EASY = 0.8, MEDIUM = 1.0, HARD = 1.3 — used when computing weighted overall
 
   // Flags
-  hintUsed                 Boolean @default(false) @map("hint_used")
-  skipped                  Boolean @default(false)
+  hintUsed Boolean @default(false) @map("hint_used")
+  skipped  Boolean @default(false)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
@@ -394,7 +466,6 @@ model CandidateQuestionResult {
   @@index([conversationId])
 }
 
-
 // ============================================
 // OVERALL INTERVIEW RESULT
 // One per CandidateInterviewSession
@@ -403,49 +474,49 @@ model CandidateQuestionResult {
 model InterviewResult {
   id          Int @id @default(autoincrement())
   interviewId Int @unique @map("interview_id")
-  sessionId   Int @unique @map("session_id")   // ties back to the session
-  userId     Int @map("user_id")              // candidate
+  sessionId   Int @unique @map("session_id") // ties back to the session
+  userId      Int @map("user_id") // candidate
 
   // Aggregate Scores (0–100)
-  overallScore         Int   @map("overall_score")
-  technicalScore       Int   @map("technical_score")
-  communicationScore   Int   @map("communication_score")
-  problemSolvingScore  Int   @map("problem_solving_score")
-  cultureFitScore      Int   @map("culture_fit_score")
+  overallScore        Int @map("overall_score")
+  technicalScore      Int @map("technical_score")
+  communicationScore  Int @map("communication_score")
+  problemSolvingScore Int @map("problem_solving_score")
+  cultureFitScore     Int @map("culture_fit_score")
 
   // Per-skill breakdown  { "algorithms": 85, "system_design": 70 }
-  skillScores          Json  @map("skill_scores")
+  skillScores Json @map("skill_scores")
 
   // Summary arrays
-  topStrengths         String[] @map("top_strengths")
-  topWeaknesses        String[] @map("top_weaknesses")
+  topStrengths  String[] @map("top_strengths")
+  topWeaknesses String[] @map("top_weaknesses")
 
   // Decision
   decision             HiringDecision
   roleReadinessPercent Int            @map("role_readiness_percent") // 0–100
 
   // Improvement plan  { "day1-2": ["..."], "day3-4": ["..."] }
-  improvementPlan      Json   @map("improvement_plan")
+  improvementPlan Json @map("improvement_plan")
 
   // Long-form
-  detailedFeedback     String @map("detailed_feedback")     @db.Text
-  transcriptSummary    String @map("transcript_summary")    @db.Text
+  detailedFeedback  String @map("detailed_feedback") @db.Text
+  transcriptSummary String @map("transcript_summary") @db.Text
 
   // Aggregate Metrics
-  totalQuestions       Int   @map("total_questions")
-  questionsAnswered    Int   @map("questions_answered")
-  questionsSkipped     Int   @default(0) @map("questions_skipped")
-  avgResponseTime      Float @map("avg_response_time")      // seconds
-  avgConfidence        Float @map("avg_confidence")
-  totalHintsUsed       Int   @map("total_hints_used")
-  interviewDuration    Int   @map("interview_duration")     // minutes
+  totalQuestions    Int   @map("total_questions")
+  questionsAnswered Int   @map("questions_answered")
+  questionsSkipped  Int   @default(0) @map("questions_skipped")
+  avgResponseTime   Float @map("avg_response_time") // seconds
+  avgConfidence     Float @map("avg_confidence")
+  totalHintsUsed    Int   @map("total_hints_used")
+  interviewDuration Int   @map("interview_duration") // minutes
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  interview Interview                  @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  session   CandidateInterviewSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interview Interview                 @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  session   CandidateInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([interviewId])
@@ -462,7 +533,6 @@ enum HiringDecision {
   STRONG_NO_HIRE
 }
 
-
 // ============================================
 // ANALYTICS & METRICS
 // ============================================
@@ -476,15 +546,15 @@ model UserMetrics {
   averageScore        Float @default(0) @map("average_score")
 
   // JSON histories  [{"date": "2024-01-01", "score": 75}, ...]
-  scoreHistory   Json @map("score_history")
-  skillProgress  Json @map("skill_progress")
+  scoreHistory  Json @map("score_history")
+  skillProgress Json @map("skill_progress")
 
-  totalPracticeTime    Int   @default(0) @map("total_practice_time")    // minutes
+  totalPracticeTime    Int   @default(0) @map("total_practice_time") // minutes
   avgInterviewDuration Float @default(0) @map("avg_interview_duration")
 
-  strongestSkills  String[] @map("strongest_skills")
-  improvingSkills  String[] @map("improving_skills")
-  needsWorkSkills  String[] @map("needs_work_skills")
+  strongestSkills String[] @map("strongest_skills")
+  improvingSkills String[] @map("improving_skills")
+  needsWorkSkills String[] @map("needs_work_skills")
 
   lastInterviewDate DateTime? @map("last_interview_date")
 

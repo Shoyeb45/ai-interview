@@ -6,6 +6,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createInterviewAgent } from "@/lib/mockApi";
 import type { ExperienceLevel, InterviewAgentStatus } from "@/types/schema";
+import type { InterviewQuestion, QuestionSelectionMode } from "@/types/schema";
+import AgentQuestionsSection, { AgentFormDetails } from "@/components/AgentQuestionsSection";
 import { toast } from "sonner";
 
 const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
@@ -36,7 +38,9 @@ export default function NewAgentPage() {
     title: "",
     role: "",
     jobDescription: "",
+    openingMessage: "",
     experienceLevel: "MID_LEVEL" as ExperienceLevel,
+    questionSelectionMode: "MIXED" as QuestionSelectionMode,
     totalQuestions: 6,
     estimatedDuration: 30,
     focusAreas: [] as string[],
@@ -45,6 +49,7 @@ export default function NewAgentPage() {
     deadline: "",
     status: "DRAFT" as InterviewAgentStatus,
   });
+  const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
 
   const toggleFocus = (area: string) => {
     setForm((f) => ({
@@ -63,7 +68,9 @@ export default function NewAgentPage() {
         title: form.title,
         role: form.role,
         jobDescription: form.jobDescription,
+        openingMessage: form.openingMessage || undefined,
         experienceLevel: form.experienceLevel,
+        questionSelectionMode: form.questionSelectionMode,
         totalQuestions: form.totalQuestions,
         estimatedDuration: form.estimatedDuration,
         focusAreas: form.focusAreas,
@@ -71,6 +78,7 @@ export default function NewAgentPage() {
         maxAttemptsPerCandidate: form.maxAttemptsPerCandidate,
         deadline: form.deadline || null,
         status: form.status,
+        questions,
       });
       toast.success("Interview agent created");
       router.push(`/dashboard/hiring-manager/agents/${agent.id}`);
@@ -130,6 +138,16 @@ export default function NewAgentPage() {
           />
         </div>
         <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Opening message (optional)</label>
+          <textarea
+            rows={3}
+            value={form.openingMessage}
+            onChange={(e) => setForm((f) => ({ ...f, openingMessage: e.target.value }))}
+            placeholder="Message shown to the candidate at the start of the interview..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Experience level</label>
           <select
             value={form.experienceLevel}
@@ -185,6 +203,19 @@ export default function NewAgentPage() {
             ))}
           </div>
         </div>
+
+        <div className="border-t border-gray-200 pt-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Questions</h2>
+          <AgentQuestionsSection
+            agentId={null}
+            formDetails={form as AgentFormDetails}
+            questionSelectionMode={form.questionSelectionMode}
+            onQuestionSelectionModeChange={(mode) => setForm((f) => ({ ...f, questionSelectionMode: mode }))}
+            questions={questions}
+            onQuestionsChange={setQuestions}
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Max candidates</label>
@@ -208,7 +239,7 @@ export default function NewAgentPage() {
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Deadline (optional)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
           <input
             type="datetime-local"
             value={form.deadline ? form.deadline.slice(0, 16) : ""}

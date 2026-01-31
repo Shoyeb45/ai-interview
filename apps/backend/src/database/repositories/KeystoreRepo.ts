@@ -1,13 +1,11 @@
 import { Keystore } from '@prisma/client';
-import { getPrismaClient } from '../index';
+import { prisma } from '..';
 
 async function create(
     clientId: number,
     primaryKey: string,
     secondaryKey: string,
 ): Promise<Keystore> {
-    const prisma =  getPrismaClient();
-    
     const keystore = await prisma.keystore.create({
         data: {
             clientId,
@@ -28,14 +26,12 @@ async function create(
 }
 
 async function remove(id: number): Promise<void> {
-    const prisma = getPrismaClient();
     await prisma.keystore.delete({
         where: { id }
     });
 }
 
 async function findForKey(clientId: number, key: string): Promise<Keystore | null> {
-    const prisma = getPrismaClient();
     
     const keystore = await prisma.keystore.findFirst({
         where: {
@@ -63,7 +59,6 @@ async function find(
     primaryKey: string,
     secondaryKey: string,
 ): Promise<Keystore | null> {
-    const prisma = getPrismaClient();
     
     const keystore = await prisma.keystore.findFirst({
         where: {

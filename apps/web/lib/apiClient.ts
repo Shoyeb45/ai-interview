@@ -140,6 +140,10 @@ class ApiClient {
     return this.axiosInstance.put<T>(url, data, config).then((res) => res.data);
   }
 
+  public async patch<T = unknown, D = unknown>(url: string, data?: D, config?: AxiosRequestConfig): Promise<T> {
+    return this.axiosInstance.patch<ApiResponse<T>>(url, data, config).then((res) => res.data?.data);
+  }
+
   public async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
     return this.axiosInstance.delete<T>(url, config).then((res) => res.data);
   }

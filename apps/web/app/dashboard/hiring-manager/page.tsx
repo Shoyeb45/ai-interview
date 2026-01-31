@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Briefcase, Plus, Users, ArrowRight } from "lucide-react";
 import { getInterviewAgents } from "@/lib/mockApi";
 import type { InterviewAgent } from "@/types/schema";
-import { getDecisionColor } from "@/lib/getDecisionColor";
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -80,7 +79,7 @@ export default function HiringManagerDashboardPage() {
             </div>
             <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
               <Users className="h-4 w-4" />
-              <span>{agent._count?.sessions ?? 0} sessions</span>
+              <span>{agent.sessions?.length ?? 0} sessions</span>
             </div>
             <div className="mt-4 flex gap-2">
               <Link
