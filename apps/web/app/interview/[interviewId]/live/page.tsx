@@ -1,14 +1,10 @@
-import VoiceChat from "@/components/interview";
+import LiveInterviewWrapper from "./LiveInterviewWrapper";
 
-export default async function page({
-    params
-}:  {
-    params: Promise<{ interviewId : string}>
+export default async function LiveInterviewPage({
+  params,
+}: {
+  params: Promise<{ interviewId: string }>;
 }) {
-    
-    const interviewId = (await params).interviewId;
-
-    return (<div>
-        <VoiceChat></VoiceChat>
-    </div>)
+  await params;
+  return <LiveInterviewWrapper />;
 }

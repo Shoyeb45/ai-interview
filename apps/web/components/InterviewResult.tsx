@@ -2,7 +2,7 @@
 
 import { Award, BookOpen, Target } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { InterviewResultData } from '@/types/interview';
+import type { InterviewResultData } from '@/types/interview';
 import { getDecisionColor } from '@/lib/getDecisionColor';
 
 interface InterviewResultProps {
@@ -127,11 +127,11 @@ export default function InterviewResult({
           <h3 className="text-lg font-semibold text-gray-900">7-Day Improvement Plan</h3>
         </div>
         <div className="space-y-4">
-          {Object.entries(data.improvementPlan).map(([days, ...tasks]) => (
+          {Object.entries(data.improvementPlan).map(([days, tasks]) => (
             <div key={days} className="border-l-4 border-blue-500 pl-4">
               <div className="font-semibold text-gray-900 mb-2">{formatPlanKey(days)}</div>
               <ul className="space-y-1">
-                {tasks.map((task, idx) => (
+                {(Array.isArray(tasks) ? tasks : []).map((task, idx) => (
                   <li key={idx} className="text-gray-700 text-sm">• {task}</li>
                 ))}
               </ul>

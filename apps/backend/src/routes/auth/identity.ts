@@ -16,6 +16,7 @@ router.get(
             id: req.user.id,
             name: req.user.name,
             email: req.user.email,
+            roles: req.user.roles.map(role => role.code)
         }).send(res);
     })
 );

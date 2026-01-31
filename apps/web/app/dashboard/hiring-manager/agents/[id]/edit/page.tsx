@@ -1,0 +1,291 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { getInterviewAgentById, updateInterviewAgent } from "@/lib/mockApi";
+import type { ExperienceLevel, InterviewAgentStatus } from "@/types/schema";
+import { toast } from "sonner";
+
+const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
+  { value: "INTERN", label: "Intern" },
+  { value: "ENTRY_LEVEL", label: "Entry Level" },
+  { value: "JUNIOR", label: "Junior (1-2 years)" },
+  { value: "MID_LEVEL", label: "Mid Level (3-5 years)" },
+  { value: "SENIOR", label: "Senior (5+ years)" },
+  { value: "LEAD", label: "Lead" },
+  { value: "PRINCIPAL", label: "Principal" },
+];
+
+const FOCUS_OPTIONS = [
+  "algorithms",
+  "system design",
+  "databases",
+  "web development",
+  "apis",
+  "security",
+  "testing",
+  "behavioral",
+];
+
+export default function EditAgentPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = Number(params.id);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: "",
+    role: "",
+    jobDescription: "",
+    experienceLevel: "MID_LEVEL" as ExperienceLevel,
+    totalQuestions: 6,
+    estimatedDuration: 30,
+    focusAreas: [] as string[],
+    maxCandidates: 100,
+    maxAttemptsPerCandidate: 3,
+    deadline: "",
+    status: "DRAFT" as InterviewAgentStatus,
+  });
+
+  const load = useCallback(async () => {
+    if (!id || isNaN(id)) return;
+    setLoading(true);
+    try {
+      const agent = await getInterviewAgentById(id);
+      if (agent) {
+        setForm({
+          title: agent.title,
+          role: agent.role,
+          jobDescription: agent.jobDescription,
+          experienceLevel: agent.experienceLevel,
+          totalQuestions: agent.totalQuestions,
+          estimatedDuration: agent.estimatedDuration,
+          focusAreas: agent.focusAreas ?? [],
+          maxCandidates: agent.maxCandidates,
+          maxAttemptsPerCandidate: agent.maxAttemptsPerCandidate,
+          deadline: agent.deadline ? new Date(agent.deadline).toISOString().slice(0, 16) : "",
+          status: agent.status,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toggleFocus = (area: string) => {
+    setForm((f) => ({
+      ...f,
+      focusAreas: f.focusAreas.includes(area)
+        ? f.focusAreas.filter((a) => a !== area)
+        : [...f.focusAreas, area],
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await updateInterviewAgent(id, {
+        title: form.title,
+        role: form.role,
+        jobDescription: form.jobDescription,
+        experienceLevel: form.experienceLevel,
+        totalQuestions: form.totalQuestions,
+        estimatedDuration: form.estimatedDuration,
+        focusAreas: form.focusAreas,
+        maxCandidates: form.maxCandidates,
+        maxAttemptsPerCandidate: form.maxAttemptsPerCandidate,
+        deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
+        status: form.status,
+      });
+      toast.success("Interview agent updated");
+      router.push(`/dashboard/hiring-manager/agents/${id}`);
+    } catch {
+      toast.error("Failed to update agent");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="text-gray-500">Loading...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <Link
+        href={`/dashboard/hiring-manager/agents/${id}`}
+        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm font-medium"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to agent
+      </Link>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Edit Interview Agent</h1>
+        <p className="text-gray-600 mt-1">Update role, questions, and limits</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+          <input
+            type="text"
+            required
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            placeholder="e.g. Backend Developer Interview"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+          <input
+            type="text"
+            required
+            value={form.role}
+            onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+            placeholder="e.g. Software Engineer"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Job description *</label>
+          <textarea
+            required
+            rows={5}
+            value={form.jobDescription}
+            onChange={(e) => setForm((f) => ({ ...f, jobDescription: e.target.value }))}
+            placeholder="Paste or describe the job requirements..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Experience level</label>
+          <select
+            value={form.experienceLevel}
+            onChange={(e) => setForm((f) => ({ ...f, experienceLevel: e.target.value as ExperienceLevel }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            {EXPERIENCE_LEVELS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Total questions</label>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={form.totalQuestions}
+              onChange={(e) => setForm((f) => ({ ...f, totalQuestions: parseInt(e.target.value, 10) || 6 }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Estimated duration (min)</label>
+            <input
+              type="number"
+              min={5}
+              value={form.estimatedDuration}
+              onChange={(e) => setForm((f) => ({ ...f, estimatedDuration: parseInt(e.target.value, 10) || 30 }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Focus areas</label>
+          <div className="flex flex-wrap gap-2">
+            {FOCUS_OPTIONS.map((area) => (
+              <button
+                key={area}
+                type="button"
+                onClick={() => toggleFocus(area)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  form.focusAreas.includes(area)
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {area}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max candidates</label>
+            <input
+              type="number"
+              min={1}
+              value={form.maxCandidates}
+              onChange={(e) => setForm((f) => ({ ...f, maxCandidates: parseInt(e.target.value, 10) || 100 }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max attempts per candidate</label>
+            <input
+              type="number"
+              min={1}
+              value={form.maxAttemptsPerCandidate}
+              onChange={(e) => setForm((f) => ({ ...f, maxAttemptsPerCandidate: parseInt(e.target.value, 10) || 3 }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Deadline (optional)</label>
+          <input
+            type="datetime-local"
+            value={form.deadline}
+            onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select
+            value={form.status}
+            onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as InterviewAgentStatus }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="DRAFT">Draft</option>
+            <option value="PUBLISHED">Published</option>
+            <option value="PAUSED">Paused</option>
+            <option value="CLOSED">Closed</option>
+            <option value="ARCHIVED">Archived</option>
+          </select>
+        </div>
+        <div className="flex gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </button>
+          <Link
+            href={`/dashboard/hiring-manager/agents/${id}`}
+            className="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </Link>
+        </div>
+      </form>
+    </div>
+  );
+}
