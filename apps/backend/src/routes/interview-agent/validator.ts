@@ -8,3 +8,11 @@ export async function verifyInterviewAgent(interviewAgentId: number) {
     
     return interviewAgent;
 }
+
+export async function verifyQuestionExists(quesionId: number) {
+    const question = await interviewAgentRepo.checkQuestionById(quesionId);
+    if (!question)
+        throw new NotFoundError('Question Not found.');
+
+    return question;
+}

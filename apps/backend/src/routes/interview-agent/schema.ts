@@ -43,15 +43,29 @@ const interviewAgentParam = z.object({
     interviewAgentId: z.coerce.number()
 });
 
+const updateInterviewAgent = createInterviewAgent.partial().extend({
+    questions: z.array(questionCreate.partial().extend({
+        questionId: z.coerce.number()
+    }))
+});
+
+const questionParam = z.object({
+    questionId: z.string().min(1)
+});
+
 export type InterviewAgentSchema = {
     CreateInterviewAgent: z.infer<typeof createInterviewAgent>;
     GenerateQuestion: z.infer<typeof generateQuestion>;
     QuestionCreate: z.infer<typeof questionCreate>;
+    UpdateInterviewAgent: z.infer<typeof updateInterviewAgent>;
 };
+
 
 export default {
     createInterviewAgent,
     generateQuestion,
     questionCreate,
-    interviewAgentParam
+    interviewAgentParam,
+    updateInterviewAgent,
+    questionParam,
 };

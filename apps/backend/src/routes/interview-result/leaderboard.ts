@@ -5,7 +5,7 @@ import { validator } from '../../middlewares/validator.middleware';
 import interviewAgentSchema from '../interview-agent/schema';
 import { ValidationSource } from '../../helpers/validator';
 import { verifyInterviewAgent } from '../interview-agent/validator';
-import { getLeaderboardByInterviewAgent } from '../../database/repositories/interview-agent.repo';
+import interviewAgentRepo from '../../database/repositories/interview-agent.repo';
 import { SuccessResponse } from '../../core/ApiResponse';
 
 const router = Router();
@@ -18,7 +18,7 @@ router.get(
         await verifyInterviewAgent(interviewAgentId);
 
         const leaderboard =
-            await getLeaderboardByInterviewAgent(interviewAgentId);
+            await interviewAgentRepo.getLeaderboardByInterviewAgent(interviewAgentId);
 
         new SuccessResponse(
             'Leaderboard fetched successfully.',
