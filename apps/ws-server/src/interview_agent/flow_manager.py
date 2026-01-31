@@ -106,7 +106,7 @@ class InterviewFlowManager:
     def get_system_prompt(self, current_question_count: int) -> str:
         """Generate dynamic system prompt based on interview config."""
         focus_str = ", ".join(self.focus_areas) if self.focus_areas else "technical skills"
-        return f"""You are an experienced technical interviewer conducting an interview for a {self.role} position.
+        return f"""You are an experienced technical interviewer conducting a CONVERSATIONAL interview for a {self.role} position. This is NOT a quiz - engage naturally with the candidate's answers.
 
 Interview Context:
 - Role: {self.role}
@@ -118,92 +118,70 @@ Interview Context:
 Job Description:
 {self.job_description[:2000]}
 
-Your personality:
-- Professional but warm and encouraging
-- Patient and supportive for {self.experience_level} candidates
-- Asks follow-up questions naturally
-- Notices when candidates struggle and provides hints
-- Acknowledges good answers with brief positive feedback
+CRITICAL - Conversational Flow (NOT quiz-style):
+1. **Always acknowledge** the candidate's answer (e.g., "Hi Shoaib, thanks for that" or "Great point about React")
+2. **Follow up when answers are brief** - If they gave a short intro like "My name is X", ask for more: "Can you tell me about your interests or skills?" or "What drew you to this role?"
+3. **Only move to the next question** when you have enough depth. Don't rush to the next question.
+4. **Personalize** - Use their name if they gave it. Reference what they said.
+5. **Keep responses natural** - 2-4 sentences. Warm and professional.
 
-Interview guidelines:
-- Keep responses SHORT (1-3 sentences max)
-- Adapt difficulty to {self.experience_level} level
-- React naturally to candidate's pace and confidence
-- If candidate struggles, provide hints or rephrase
-- If candidate gives great answer, acknowledge briefly before moving on
-- Focus on areas: {focus_str}
+When to follow up vs move on:
+- Brief answer (1-2 sentences) → Follow up to get more depth. Do NOT end with [NEXT].
+- Satisfactory answer (good detail) → Acknowledge and move to next question. End with [NEXT].
+- If unsure, prefer follow-up. Better to ask once more than rush.
 
-Response types based on context:
-1. **Long pause after question** → "Take your time. Would you like me to rephrase?"
-2. **Struggling/hesitant answer** → Provide hint: "Let me give you a hint: think about..."
-3. **Good answer** → Brief acknowledgment: "Great! That's exactly right. Next question..."
-4. **Incomplete answer** → "Good start. Can you elaborate on..."
-5. **Off-topic** → Gently redirect: "Interesting, but let's focus on..."
-
-IMPORTANT: Track the question number. After completing question {self.total_questions}, wrap up the interview politely.
+Output format: End your response with exactly [NEXT] ONLY when moving to the next question. If asking a follow-up, do NOT include [NEXT].
 """
 
-    def get_next_question(
-        self,
-        previous_answer: Optional[str] = None,
-        context: Optional[Dict] = None,
-    ) -> Tuple[Optional[str], str, Dict]:
+    def get_context_for_interviewer_response(self) -> Tuple[str, Optional[str], str, Dict]:
         """
-        Get the next question or instruction for LLM.
-        Returns: (predefined_question_text or None, system_prompt, llm_context)
+        Get context for LLM to generate a CONVERSATIONAL response (acknowledge + follow-up OR acknowledge + next).
+        Does NOT advance - advancement happens only when LLM signals move_to_next.
 
-        - If predefined question exists: return (question_text, system_prompt, {}) -> caller speaks it directly
-        - If LLM should generate: return (None, system_prompt, context) -> caller uses ai_brain
+        Returns: (current_question_context, next_question_text, system_prompt, llm_context)
+        - current_question_context: what we asked (or "opening/self-introduction" for first turn)
+        - next_question_text: the next question to ask when advancing (predefined or instruction for LLM)
         """
         if self.current_question_index >= self.total_questions:
-            return None, self.get_system_prompt(self.current_question_index), {}
+            return "", None, self.get_system_prompt(self.current_question_index), {}
 
-        mode = self.question_selection_mode.upper()
         system_prompt = self.get_system_prompt(self.current_question_index)
-        llm_context = context or {}
+        llm_context: Dict[str, Any] = {}
 
-        # CUSTOM_ONLY: use provided questions in order
-        if mode == "CUSTOM_ONLY":
-            if self.current_question_index < len(self._questions_sorted):
-                q = self._questions_sorted[self.current_question_index]
-                text = q.get("questionText") or ""
-                if text.strip():
-                    self.current_question_index += 1
-                    return text.strip(), system_prompt, {}
-            self.current_question_index += 1
-            return None, system_prompt, llm_context
+        # Current question context - what we asked (for follow-up awareness)
+        if self.current_question_index == 0:
+            current_context = "Opening / self-introduction (asked candidate to introduce themselves)"
+        else:
+            # We're on question current_question_index (1-indexed: question 1, 2, ...)
+            current_context = self._get_question_text_at(self.current_question_index - 1)
+            if not current_context:
+                current_context = f"Question {self.current_question_index} (from focus areas)"
 
-        # AI_ONLY: always generate
-        if mode == "AI_ONLY":
-            self.current_question_index += 1
-            instruction = (
-                f"Ask question {self.current_question_index} of {self.total_questions}. "
-                f"Base it on the job description and focus areas. "
-                f"{'The previous answer was: ' + previous_answer[:300] if previous_answer else ''}"
-            )
-            llm_context["question_instruction"] = instruction
-            return None, system_prompt, llm_context
+        # Next question - what to ask when we advance
+        next_question_text = self._get_question_text_at(self.current_question_index)
+        if next_question_text:
+            llm_context["next_question"] = next_question_text
+        else:
+            mode = self.question_selection_mode.upper()
+            if mode == "AI_ONLY" or mode == "MIXED":
+                next_num = self.current_question_index + 1
+                llm_context["next_question_instruction"] = (
+                    f"Generate question {next_num} of {self.total_questions} based on job description and focus areas."
+                )
 
-        # MIXED: use custom if available, else generate
-        if mode == "MIXED" and self.current_question_index < len(self._questions_sorted):
-            q = self._questions_sorted[self.current_question_index]
-            text = q.get("questionText") or ""
-            if text.strip():
-                self.current_question_index += 1
-                return text.strip(), system_prompt, {}
+        return current_context, next_question_text, system_prompt, llm_context
 
+    def _get_question_text_at(self, index: int) -> Optional[str]:
+        """Get predefined question text at index, or None if none."""
+        if index < 0 or index >= len(self._questions_sorted):
+            return None
+        q = self._questions_sorted[index]
+        text = q.get("questionText") or ""
+        return text.strip() if text else None
+
+    def advance_to_next_question(self) -> None:
+        """Call when LLM has decided to move to the next question."""
         self.current_question_index += 1
-        instruction = (
-            f"Ask question {self.current_question_index} of {self.total_questions}. "
-            f"Generate based on job description and focus areas. "
-            f"{'Previous answer: ' + previous_answer[:300] if previous_answer else ''}"
-        )
-        llm_context["question_instruction"] = instruction
-        return None, system_prompt, llm_context
-
-    def advance_question_index(self) -> None:
-        """Called when we use a predefined question (since get_next_question already increments)."""
-        pass  # Already incremented in get_next_question
 
     def is_interview_complete(self) -> bool:
         return self.current_question_index >= self.total_questions

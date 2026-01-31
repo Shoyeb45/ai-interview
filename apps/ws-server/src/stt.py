@@ -182,7 +182,7 @@ class StreamingSpeechProcessor:
             asyncio.create_task(self._generate_response(text, context))
             
     async def _generate_response(self, user_text: str, context: dict):
-        """Generate AI response - uses flow_manager for dynamic questions (provided or LLM-generated)."""
+        """Generate CONVERSATIONAL AI response: acknowledge + follow-up OR acknowledge + next question."""
         try:
             if not self.flow_manager:
                 print("❌ No flow manager - cannot generate response")
@@ -190,34 +190,40 @@ class StreamingSpeechProcessor:
 
             if self.flow_manager.is_interview_complete():
                 print("[CHECKPOINT] Interview complete - wrapping up")
-                # Could send a closing message - for now, still try to get next (will return None)
-                pass
+                ai_response = "Thank you for your time. That concludes our interview. We'll be in touch!"
+                self.state.add_message("assistant", ai_response)
+                await send_over_ws(self.ws, {"type": "llm_response", "response": ai_response})
+                if self.tts_track:
+                    await self._play_tts(ai_response)
+                return
 
             await send_over_ws(self.ws, {
                 "type": "ai_status",
                 "status": "thinking"
             })
 
-            predefined_question, system_prompt, llm_context = self.flow_manager.get_next_question(
-                previous_answer=user_text,
-                context=context,
-            )
+            current_ctx, next_q, system_prompt, llm_context = self.flow_manager.get_context_for_interviewer_response()
 
-            if predefined_question:
-                ai_response = predefined_question
-            else:
-                merged_context = {**context, **llm_context}
-                ai_response = await get_interviewer_response(
-                    self.state.conversation_history,
-                    system_prompt,
-                    self.metrics,
-                    merged_context,
-                )
+            merged_context = {
+                **context,
+                **llm_context,
+                "current_question_context": current_ctx,
+            }
+            if next_q:
+                merged_context["next_question"] = next_q
+
+            ai_response, move_to_next = await get_interviewer_response(
+                self.state.conversation_history,
+                system_prompt,
+                self.metrics,
+                merged_context,
+            )
 
             self.state.add_message("assistant", ai_response)
 
-            # Start timer for next question (for metrics)
-            self.metrics.start_question()
+            if move_to_next:
+                self.flow_manager.advance_to_next_question()
+                self.metrics.start_question()
 
             # Send text response
             await send_over_ws(self.ws, {
