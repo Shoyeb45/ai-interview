@@ -9,6 +9,7 @@
     "dev": "nodemon",
     "start": "npm run build && npm run serve",
     "serve": "node -r dotenv/config dist/index.js",
+    "worker:interview": "ts-node -r tsconfig-paths/register src/events/interview-event-worker.ts",
     "test": "jest",
     "prettier:base": "prettier --parser typescript --single-quote",
     "prettier:check": "npm run prettier:base -- --list-different \"src/**/*.{ts,tsx}\"",

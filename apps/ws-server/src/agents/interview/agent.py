@@ -15,6 +15,7 @@ class InterviewAgent(BaseAgent):
             session.metrics,
             session.tts_track,
             session.flow_manager,
+            session,
         )
 
     async def start(self):

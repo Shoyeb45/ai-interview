@@ -23,9 +23,12 @@ class SpeechState:
         self.is_speaking = False
 
 
-    def add_message(self, role: str, content: str):
-        """Add message to conversation history"""
+    def add_message(self, role: str, content: str, timestamp: float = None):
+        """Add message to conversation history with optional timestamp."""
+        import time
+        ts = timestamp or time.time()
         self.conversation_history.append({
             "role": role,  # "user" or "assistant"
-            "content": content
+            "content": content,
+            "timestamp": ts,
         })

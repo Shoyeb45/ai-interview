@@ -9,6 +9,7 @@ from src.interview_agent.software_engineer import InterviewMetrics, provide_enco
 from src.websocket.webrtc_tts_track import TTSAudioTrack
 from src.tts_service import tts_service
 from src.core.helper import send_over_ws
+from src.services.redis.event_emitter import emit_question_evaluate, emit_end_interview, emit_generate_report
 
 model = WhisperModel('small.en', device='cpu', compute_type='int8')
 
@@ -69,12 +70,13 @@ async def transcribe_audio(speech: np.ndarray) -> str:
 
 class StreamingSpeechProcessor:
     """Non-blocking speech processor with interrupt handling"""
-    def __init__(self, ws: WebSocket, state: SpeechState, metrics: InterviewMetrics, tts_track: TTSAudioTrack = None, flow_manager=None):
+    def __init__(self, ws: WebSocket, state: SpeechState, metrics: InterviewMetrics, tts_track: TTSAudioTrack = None, flow_manager=None, session=None):
         self.ws = ws
         self.state = state
         self.metrics = metrics
         self.tts_track = tts_track
         self.flow_manager = flow_manager
+        self.session = session
         self.processing_queue = asyncio.Queue()
         self.is_processing = False
         self.last_activity_time = time.time()
@@ -190,8 +192,13 @@ class StreamingSpeechProcessor:
 
             if self.flow_manager.is_interview_complete():
                 print("[CHECKPOINT] Interview complete - wrapping up")
+                # Use AI-generated closing if we got one, else fallback
                 ai_response = "Thank you for your time. That concludes our interview. We'll be in touch!"
                 self.state.add_message("assistant", ai_response)
+                if self.session:
+                    self.session.interview_completed = True
+                    emit_end_interview(self.session, self.state.conversation_history)
+                    emit_generate_report(self.session, self.state.conversation_history)
                 await send_over_ws(self.ws, {"type": "llm_response", "response": ai_response})
                 if self.tts_track:
                     await self._play_tts(ai_response)
@@ -222,6 +229,30 @@ class StreamingSpeechProcessor:
             self.state.add_message("assistant", ai_response)
 
             if move_to_next:
+                # Emit question_evaluate before advancing (we have correct question number)
+                q_num = self.flow_manager.current_question_index
+                q_ctx, _, _, _ = self.flow_manager.get_context_for_interviewer_response()
+                if self.session:
+                    import time
+                    question_asked_at = self.metrics.question_start_time
+                    answer_dur = self.metrics.get_answer_duration()
+                    emit_question_evaluate(
+                        self.session,
+                        question_number=q_num,
+                        question=q_ctx or "",
+                        user_response=user_text,
+                        ai_response=ai_response,
+                        question_asked_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(question_asked_at)) if question_asked_at else None,
+                        answer_started_at=None,  # Not tracked precisely
+                        answer_ended_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        thinking_time_sec=0,
+                        answer_duration_sec=int(answer_dur) if answer_dur else None,
+                        conversation_history=self.state.conversation_history.copy(),
+                        metrics={
+                            "struggling_indicators": self.metrics.struggling_indicators,
+                            "confidence_score": context.get("answer_analysis", {}).get("is_confident", False),
+                        },
+                    )
                 self.flow_manager.advance_to_next_question()
                 self.metrics.start_question()
 

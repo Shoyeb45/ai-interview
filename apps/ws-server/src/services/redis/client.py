@@ -58,8 +58,33 @@ class RedisClient:
         self.redis.delete(key)
 
     # -------------------------
-    # Health check
+    # Stream operations (for event publishing)
     # -------------------------
+
+    def xadd_event(self, stream_key: str, event_type: str, payload: dict, max_len: Optional[int] = 10000) -> Optional[str]:
+        """
+        Add event with type and payload to Redis stream.
+        Returns message ID or None on error.
+        payload: dict (will be JSON-serialized)
+        """
+        import json
+        import time
+        try:
+            fields = {
+                "event": event_type,
+                "payload": json.dumps(payload, default=str),
+                "ts": str(time.time()),
+            }
+            kwargs = {}
+            if max_len:
+                kwargs["maxlen"] = max_len
+                kwargs["approximate"] = True
+            msg_id = self.redis.xadd(stream_key, fields, **kwargs)
+            return msg_id
+        except redis.RedisError as e:
+            logger.error("Redis XADD event failed", exc_info=e)
+            return None
+
 
     def health_check(self) -> bool:
         try:

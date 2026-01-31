@@ -18,6 +18,7 @@ from src.media.audio.pipeline import AudioPipeline
 from src.transport.websocket import WebSocketTransport
 from src.transport.webrtc_output import WebRTCOutput
 from src.transport.composite import CompositeTransport
+from src.services.redis.event_emitter import emit_abandon_interview
 
 active_sessions: dict[str, InterviewSession] = {}
 
@@ -119,6 +120,13 @@ class WebRTCAudioInput:
         await self.session.agent.processor.stop()
         await asyncio.sleep(0.1)
         try:
+            # Emit abandon_interview if not successfully completed
+            if not getattr(self.session, "interview_completed", False) and self.session.flow_manager:
+                emit_abandon_interview(
+                    self.session,
+                    reason="connection_closed",
+                    conversation_history=getattr(self.session.state, "conversation_history", []),
+                )
             await self.pc.close()
             if self.user_id in active_sessions:
                 del active_sessions[self.user_id]
