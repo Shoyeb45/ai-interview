@@ -154,7 +154,7 @@ model InterviewAgent {
   // ── LIMITS (production controls) ──
   maxCandidates     Int      @default(100) @map("max_candidates")     // max unique candidates allowed to attempt
   maxAttemptsPerCandidate Int @default(3)  @map("max_attempts_per_candidate") // how many times one candidate can retry
-  deadline          DateTime?             // after this date no new sessions can start
+  deadline          DateTime?   @db.Timestamptz(6)           // after this date no new sessions can start
 
   // Lifecycle
   status       InterviewAgentStatus @default(DRAFT)

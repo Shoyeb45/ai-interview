@@ -1,5 +1,5 @@
 import { Router } from "express";
-import authentication from "./authentication";
+import authentication from "../../middlewares/authentication.middleware";
 import { ProtectedRequest } from "../../types/app-requests";
 import { asyncHandler } from "../../core/asyncHandler";
 import { SuccessResponse } from "../../core/ApiResponse";

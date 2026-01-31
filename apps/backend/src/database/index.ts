@@ -1,7 +1,7 @@
 import logger from '../core/logger';
 import { PrismaClient } from '@prisma/client';
 
-let prisma: PrismaClient;
+export let prisma: PrismaClient;
 
 export async function connectDB() {
     try {
@@ -37,3 +37,4 @@ export function getPrismaClient(): PrismaClient {
     }
     return prisma;
 }
+

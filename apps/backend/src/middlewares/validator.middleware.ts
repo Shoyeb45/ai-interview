@@ -167,6 +167,10 @@ export const validator = (
 
             return next(new BadRequestError(z.prettifyError(result.error)));
         }
+
+        if (source !== ValidationSource.REQUEST) {
+            Object.assign(req[source], result.data);
+        }
         next();
     };
 };
