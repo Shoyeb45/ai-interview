@@ -100,7 +100,7 @@ export default function HiringManagerAgentsPage() {
                   </span>
                 </td>
                 <td className="py-3 px-4 text-gray-600">{agent.totalQuestions}</td>
-                <td className="py-3 px-4 text-gray-600">{agent._count?.sessions ?? 0}</td>
+                <td className="py-3 px-4 text-gray-600">{agent.sessions?.length ?? 0}</td>
                 <td className="py-3 px-4 text-right">
                   <Link
                     href={`/dashboard/hiring-manager/agents/${agent.id}`}

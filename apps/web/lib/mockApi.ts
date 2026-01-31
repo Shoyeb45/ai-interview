@@ -648,6 +648,8 @@ export async function getSessionsByAgentId(
   agentId: number,
 ): Promise<CandidateInterviewSession[]> {
   await delay(350);
+  const leaderboard = await apiClient.get<CandidateInterviewSession[]>('/interview-result' + agentId);
+  
   const agent = mockAgents.find((a) => a.id === agentId);
   return mockSessions
     .filter((s) => s.interviewAgentId === agentId)
