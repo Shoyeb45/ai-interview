@@ -11,7 +11,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import asyncio
 from src.websocket.websocket_conn import handle_websocket_message
 from src.core.helper import get_token
-from src.manager.audio_manager import AudioManager
+from src.session.session import InterviewSession
+from src.manager.webrtc_audio_input import WebRTCAudioInput
 
 
 # Global states
@@ -23,23 +24,24 @@ async def websocket_endpoint(ws: WebSocket):
     print("WebSocket connection accepted")
 
     user_id = get_token(str(ws.url))
-    print(f"[{user_id}] User Connected.")
+    print(f"[CHECKPOINT] user_connected user_id={user_id}")
 
-    audio_manager = AudioManager(ws, user_id)
-    await audio_manager.start_processor()
+    session = InterviewSession(user_id)
+    webrtc_input = WebRTCAudioInput(ws, user_id, session)
+    await webrtc_input.start_processor()
     
-    @audio_manager.pc.on('track')
+    @webrtc_input.pc.on('track')
     async def _on_track(track: MediaStreamTrack):
-        await audio_manager.on_track(track)
+        await webrtc_input.on_track(track)
 
-    @audio_manager.pc.on('connectionstatechange')
+    @webrtc_input.pc.on('connectionstatechange')
     async def _on_state_change():
-        await audio_manager.on_state_change()
+        await webrtc_input.on_state_change()
 
     # Handle WebSocket messages
     async def handle_messages():
         try:
-            await handle_websocket_message(ws, audio_manager.pc, audio_manager.should_stop)
+            await handle_websocket_message(ws, webrtc_input.pc, webrtc_input.should_stop)
         except WebSocketDisconnect:
             print("WebSocket disconnected")
         except Exception as e:
@@ -49,10 +51,10 @@ async def websocket_endpoint(ws: WebSocket):
     
     # Start message handler
     message_task = asyncio.create_task(handle_messages())
-    await audio_manager.process_audio()
+    await webrtc_input.process_audio()
 
     # Wait for completion
     try:
         await message_task
     finally:
-        await audio_manager.cleanup()
+        await webrtc_input.cleanup()
