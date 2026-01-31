@@ -47,6 +47,14 @@ export interface HiringManagerInformation {
   linkedinUrl: string | null;
   website: string | null;
   maxActiveInterviews: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Hiring manager info for candidate-facing interview list/detail (from backend) */
+export interface InterviewAgentHiringManager {
+  name: string;
+  companyName: string;
 }
 
 export interface InterviewAgent {
@@ -69,6 +77,9 @@ export interface InterviewAgent {
   createdAt: string;
   updatedAt: string;
   _count?: { sessions: number };
+  /** Populated when listing for candidates (hiring manager name & company) */
+  createdBy?: { name: string };
+  companyName?: string;
 }
 
 /** Minimal candidate info for leaderboard / HM views */

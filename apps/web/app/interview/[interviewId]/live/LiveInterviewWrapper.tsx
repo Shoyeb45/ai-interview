@@ -6,7 +6,9 @@ import VoiceChat from "@/components/interview";
 export default function LiveInterviewWrapper() {
   return (
     <ProtectedRoute>
-      <VoiceChat />
+      <div className="fixed inset-0 w-full h-full overflow-hidden bg-gray-50">
+        <VoiceChat />
+      </div>
     </ProtectedRoute>
   );
 }

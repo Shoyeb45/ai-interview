@@ -24,7 +24,18 @@ const mockUser: User = {
   name: "Jane Doe",
   email: "jane@example.com",
   roles: [{ code: "USER" }],
-  hiringManagerInformation: null,
+  hiringManagerInformation: {
+      id: 1,
+      hiringManagerId: 2,
+      companyName: 'string',
+      companySize: 'STARTUP',
+      industry: 'string',
+      department: 'string',
+      teamName: null,
+      linkedinUrl: null,
+      website: null,
+      maxActiveInterviews: 0,
+  },
 };
 
 const mockHmProfile: HiringManagerInformation = {
@@ -38,6 +49,8 @@ const mockHmProfile: HiringManagerInformation = {
   linkedinUrl: "https://linkedin.com/in/john",
   website: "https://techcorp.com",
   maxActiveInterviews: 10,
+  createdAt: "2025-01-01T00:00:00Z",
+  updatedAt: "2025-01-15T10:00:00Z",
 };
 
 const mockHiringManagerUser: User = {
@@ -182,11 +195,41 @@ export async function updateInterviewAgent(
   return mockAgents[idx];
 }
 
-// ─── Candidate: Available agents (published) ───────────────────────────────────
+// ─── Candidate: Available agents (published, with HM name & company) ─────────────
+
+function withHiringManagerInfo(agent: InterviewAgent): InterviewAgent {
+  return {
+    ...agent,
+    createdBy: { name: mockHiringManagerUser.name },
+    companyName: mockHmProfile.companyName,
+  };
+}
 
 export async function getPublishedInterviewAgents(): Promise<InterviewAgent[]> {
   await delay(350);
-  return mockAgents.filter((a) => a.status === "PUBLISHED" && a.isActive);
+  return mockAgents
+    .filter((a) => a.status === "PUBLISHED" && a.isActive)
+    .map(withHiringManagerInfo);
+}
+
+export async function getInterviewAgentByIdForCandidate(
+  id: number
+): Promise<InterviewAgent | null> {
+  await delay(200);
+  const agent = mockAgents.find((a) => a.id === id) ?? null;
+  if (agent && agent.status === "PUBLISHED" && agent.isActive) {
+    return withHiringManagerInfo(agent);
+  }
+  return agent ? withHiringManagerInfo(agent) : null;
+}
+
+/** How many times the current candidate has attempted this agent (for pre-start screen) */
+export async function getMyAttemptCountForAgent(agentId: number): Promise<number> {
+  await delay(200);
+  const currentCandidateId = 1; // from auth in real app
+  return mockSessions.filter(
+    (s) => s.interviewAgentId === agentId && s.candidateId === currentCandidateId
+  ).length;
 }
 
 // ─── Candidate: My sessions & results ────────────────────────────────────────
@@ -363,12 +406,19 @@ export async function getResultBySessionId(sessionId: number): Promise<Interview
 export async function startSession(interviewAgentId: number): Promise<CandidateInterviewSession> {
   await delay(500);
   const agent = mockAgents.find((a) => a.id === interviewAgentId);
-  if (!agent) throw new Error("Agent not found");
+  if (!agent) throw new Error("Interview not found or no longer available.");
+  const currentCandidateId = 1;
+  const myAttempts = mockSessions.filter(
+    (s) => s.interviewAgentId === interviewAgentId && s.candidateId === currentCandidateId
+  ).length;
+  if (myAttempts >= agent.maxAttemptsPerCandidate) {
+    throw new Error(`Maximum attempts (${agent.maxAttemptsPerCandidate}) reached for this interview.`);
+  }
   const nextId = Math.max(0, ...mockSessions.map((s) => s.id)) + 1;
   const newSession: CandidateInterviewSession = {
     id: nextId,
     interviewAgentId,
-    candidateId: 1,
+    candidateId: currentCandidateId,
     interviewId: 100 + nextId,
     status: "PENDING",
     startedAt: null,
