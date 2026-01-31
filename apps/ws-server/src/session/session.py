@@ -1,14 +1,17 @@
 from src.speech_state import SpeechState
 from src.interview_agent.software_engineer import InterviewMetrics
-from src.core.helper import send_over_ws
+from src.core.helper import send_over_ws, verify_jwt
 from src.tts_service import tts_service
+from src.interview_agent.flow_manager import InterviewFlowManager, SessionNotFoundError
 
 
 class InterviewSession:
-    def __init__(self, user_id: str):
-        self.user_id = user_id
+    def __init__(self, token: str, session_id: str):
+        self.token = token
+        self.session_id = session_id
         self.state = SpeechState()
         self.metrics = InterviewMetrics()
+        self.flow_manager: InterviewFlowManager | None = None
         self.transport = None  # set by manager (Transport abstraction)
         self.ws = None  # set by WebRTC/WS layer (legacy; prefer transport)
         self.tts_track = None  # set by WebRTC layer (legacy; prefer transport)
@@ -24,6 +27,15 @@ class InterviewSession:
         elif self.ws:
             await send_over_ws(self.ws, msg)
 
+    def verify_jwt(self):
+        try:
+            payload = verify_jwt(self.token)
+            print(payload)
+            self.user_id = payload['sub']
+            return payload
+        except Exception as e:
+            print(e)
+            return None
     async def speak(self, text: str, silence_before_ms: int = 300, silence_after_ms: int = 0):
         """Generate TTS and queue for playback."""
         if not text:

@@ -10,7 +10,6 @@ process.on('unhandledRejection', (reason, promise) => {
 import http from "http";
 import logger from './core/logger.js';
 import { port } from './config.js';
-import { connectDB } from './database/index.js';
 import { app } from './app.js';
 
 
@@ -18,8 +17,6 @@ import { app } from './app.js';
 async function start() {
     try {
         const server = http.createServer(app);
-        await connectDB(); // Connect DB first
-        logger.info('Database connected');
 
         logger.info('App loaded');
         server.listen(port, () => {

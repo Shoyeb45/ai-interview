@@ -5,6 +5,6 @@ export default async function LiveInterviewPage({
 }: {
   params: Promise<{ interviewId: string }>;
 }) {
-  await params;
-  return <LiveInterviewWrapper />;
+  const { interviewId } = await params;
+  return <LiveInterviewWrapper interviewId={interviewId} />;
 }

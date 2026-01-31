@@ -5,7 +5,7 @@ import time
 from fastapi import WebSocket
 from src.speech_state import SpeechState
 from src.interview_agent.ai_brain import get_interviewer_response
-from src.interview_agent.software_engineer import SYSTEM_PROMPT, InterviewMetrics, provide_encouragement
+from src.interview_agent.software_engineer import InterviewMetrics, provide_encouragement
 from src.websocket.webrtc_tts_track import TTSAudioTrack
 from src.tts_service import tts_service
 from src.core.helper import send_over_ws
@@ -69,11 +69,12 @@ async def transcribe_audio(speech: np.ndarray) -> str:
 
 class StreamingSpeechProcessor:
     """Non-blocking speech processor with interrupt handling"""
-    def __init__(self, ws: WebSocket, state: SpeechState, metrics: InterviewMetrics, tts_track: TTSAudioTrack = None):
+    def __init__(self, ws: WebSocket, state: SpeechState, metrics: InterviewMetrics, tts_track: TTSAudioTrack = None, flow_manager=None):
         self.ws = ws
         self.state = state
         self.metrics = metrics
         self.tts_track = tts_track
+        self.flow_manager = flow_manager
         self.processing_queue = asyncio.Queue()
         self.is_processing = False
         self.last_activity_time = time.time()
@@ -145,10 +146,10 @@ class StreamingSpeechProcessor:
         # Get answer duration
         answer_duration = self.metrics.get_answer_duration()
         
-        # Send processing indicator
+        # Send processing indicator (full utterance built; analyzing now)
         await send_over_ws(self.ws, {
             "type": "processing",
-            "status": "transcribing"
+            "status": "analyzing"
         })
         
         # Transcribe
@@ -181,37 +182,59 @@ class StreamingSpeechProcessor:
             asyncio.create_task(self._generate_response(text, context))
             
     async def _generate_response(self, user_text: str, context: dict):
-        """Generate AI response"""
+        """Generate CONVERSATIONAL AI response: acknowledge + follow-up OR acknowledge + next question."""
         try:
+            if not self.flow_manager:
+                print("❌ No flow manager - cannot generate response")
+                return
+
+            if self.flow_manager.is_interview_complete():
+                print("[CHECKPOINT] Interview complete - wrapping up")
+                ai_response = "Thank you for your time. That concludes our interview. We'll be in touch!"
+                self.state.add_message("assistant", ai_response)
+                await send_over_ws(self.ws, {"type": "llm_response", "response": ai_response})
+                if self.tts_track:
+                    await self._play_tts(ai_response)
+                return
+
             await send_over_ws(self.ws, {
                 "type": "ai_status",
                 "status": "thinking"
             })
-            
-            ai_response = await get_interviewer_response(
+
+            current_ctx, next_q, system_prompt, llm_context = self.flow_manager.get_context_for_interviewer_response()
+
+            merged_context = {
+                **context,
+                **llm_context,
+                "current_question_context": current_ctx,
+            }
+            if next_q:
+                merged_context["next_question"] = next_q
+
+            ai_response, move_to_next = await get_interviewer_response(
                 self.state.conversation_history,
-                self.state.current_question_count,
-                SYSTEM_PROMPT,
+                system_prompt,
                 self.metrics,
-                context
+                merged_context,
             )
-            
+
             self.state.add_message("assistant", ai_response)
-            self.state.current_question_count += 1
-            
-            # Start timer for next question
-            self.metrics.start_question()
-            
+
+            if move_to_next:
+                self.flow_manager.advance_to_next_question()
+                self.metrics.start_question()
+
             # Send text response
             await send_over_ws(self.ws, {
                 "type": "llm_response",
                 "response": ai_response
             })
-            
+
             # Generate and play TTS audio
             if self.tts_track:
                 await self._play_tts(ai_response)
-            
+
         except Exception as e:
             print(f"❌ AI response error: {e}")
             import traceback

@@ -2,7 +2,7 @@ import { SuccessMsgResponse } from '../../core/ApiResponse';
 import { asyncHandler } from '../../core/asyncHandler';
 import KeystoreRepo from '../../database/repositories/KeystoreRepo';
 import { Router } from 'express';
-import authentication from './authentication';
+import authentication from '../../middlewares/authentication.middleware';
 import { ProtectedRequest } from '../../types/app-requests';
 import { clearCookies } from '../../core/cookieUtils';
 

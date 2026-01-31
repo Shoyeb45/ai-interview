@@ -7,13 +7,18 @@ import type {
   User,
   HiringManagerInformation,
   InterviewAgent,
+  InterviewQuestion,
   CandidateInterviewSession,
   InterviewResult,
   UserMetrics,
-  CompanySize,
   ExperienceLevel,
   InterviewAgentStatus,
+  QuestionSelectionMode,
+  QuestionCategory,
+  DifficultyLevel,
 } from "@/types/schema";
+import apiClient from "./apiClient";
+import { AgentFormDetails } from "@/components/AgentQuestionsSection";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -24,7 +29,18 @@ const mockUser: User = {
   name: "Jane Doe",
   email: "jane@example.com",
   roles: [{ code: "USER" }],
-  hiringManagerInformation: null,
+  hiringManagerInformation: {
+    id: 1,
+    hiringManagerId: 2,
+    companyName: "string",
+    companySize: "STARTUP",
+    industry: "string",
+    department: "string",
+    teamName: null,
+    linkedinUrl: null,
+    website: null,
+    maxActiveInterviews: 0,
+  },
 };
 
 const mockHmProfile: HiringManagerInformation = {
@@ -38,6 +54,8 @@ const mockHmProfile: HiringManagerInformation = {
   linkedinUrl: "https://linkedin.com/in/john",
   website: "https://techcorp.com",
   maxActiveInterviews: 10,
+  createdAt: "2025-01-01T00:00:00Z",
+  updatedAt: "2025-01-15T10:00:00Z",
 };
 
 const mockHiringManagerUser: User = {
@@ -67,12 +85,20 @@ export async function getHiringManagerProfile(): Promise<HiringManagerInformatio
 }
 
 export async function updateHiringManagerProfile(
-  data: Partial<HiringManagerInformation>
+  data: Partial<HiringManagerInformation>,
 ): Promise<HiringManagerInformation> {
   await delay(300);
-  if (!mockHiringManagerUser.hiringManagerInformation) throw new Error("No HM profile");
-  const updated = { ...mockHiringManagerUser.hiringManagerInformation, ...data };
-  (mockHiringManagerUser as { hiringManagerInformation: HiringManagerInformation }).hiringManagerInformation = updated;
+  if (!mockHiringManagerUser.hiringManagerInformation)
+    throw new Error("No HM profile");
+  const updated = {
+    ...mockHiringManagerUser.hiringManagerInformation,
+    ...data,
+  };
+  (
+    mockHiringManagerUser as {
+      hiringManagerInformation: HiringManagerInformation;
+    }
+  ).hiringManagerInformation = updated;
   return updated;
 }
 
@@ -86,6 +112,7 @@ const mockAgents: InterviewAgent[] = [
     role: "Software Engineer",
     jobDescription: "Build scalable APIs and services.",
     experienceLevel: "MID_LEVEL",
+    questionSelectionMode: "MIXED",
     totalQuestions: 6,
     estimatedDuration: 30,
     focusAreas: ["algorithms", "system design", "databases"],
@@ -107,6 +134,7 @@ const mockAgents: InterviewAgent[] = [
     role: "Frontend Engineer",
     jobDescription: "React, TypeScript, and UI performance.",
     experienceLevel: "SENIOR",
+    questionSelectionMode: "MIXED",
     totalQuestions: 5,
     estimatedDuration: 25,
     focusAreas: ["web development", "apis", "testing"],
@@ -123,21 +151,193 @@ const mockAgents: InterviewAgent[] = [
   },
 ];
 
-export async function getInterviewAgents(): Promise<InterviewAgent[]> {
-  await delay(350);
-  return [...mockAgents];
+// ─── Interview Questions (per agent) ─────────────────────────────────────────
+
+const mockQuestionsByAgent: Map<number, InterviewQuestion[]> = new Map([
+  [
+    1,
+    [
+      {
+        id: 101,
+        interviewAgentId: 1,
+        questionText:
+          "Explain the difference between REST and GraphQL. When would you choose one over the other?",
+        category: "TECHNICAL",
+        difficulty: "MEDIUM",
+        orderIndex: 1,
+        estimatedTime: 5,
+        isActive: true,
+        expectedKeywords: ["REST", "GraphQL", "API", "endpoints"],
+        focusAreas: ["apis"],
+      },
+      {
+        id: 102,
+        interviewAgentId: 1,
+        questionText:
+          "Describe how you would design a rate-limiting system for an API.",
+        category: "TECHNICAL",
+        difficulty: "HARD",
+        orderIndex: 2,
+        estimatedTime: 5,
+        isActive: true,
+        expectedKeywords: ["rate limit", "token bucket", "sliding window"],
+        focusAreas: ["system design", "apis"],
+      },
+    ],
+  ],
+  [2, []],
+]);
+
+function getNextQuestionId(): number {
+  let max = 0;
+  mockQuestionsByAgent.forEach((list) => {
+    list.forEach((q) => {
+      if (q.id > max) max = q.id;
+    });
+  });
+  return max + 1;
 }
 
-export async function getInterviewAgentById(id: number): Promise<InterviewAgent | null> {
+export async function getInterviewAgents(): Promise<InterviewAgent[]> {
+  await delay(350);
+  const interviewAgents =
+    await apiClient.get<InterviewAgent[]>("/interview-agent");
+  return interviewAgents;
+}
+
+export async function getInterviewAgentById(
+  id: number,
+): Promise<InterviewAgent | null> {
   await delay(200);
-  return mockAgents.find((a) => a.id === id) ?? null;
+
+  const agent = await apiClient.get<InterviewAgent | null>(
+    `/interview-agent/${id}`,
+  );
+  return agent;
+}
+
+export async function getQuestionsByAgentId(
+  agentId: number,
+): Promise<InterviewQuestion[]> {
+  await delay(200);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  return [...list].sort((a, b) => a.orderIndex - b.orderIndex);
+}
+
+export async function createQuestion(
+  agentId: number,
+  data: {
+    questionText: string;
+    category: QuestionCategory;
+    difficulty: DifficultyLevel;
+    orderIndex: number;
+    estimatedTime?: number;
+    expectedKeywords?: string[];
+    focusAreas?: string[];
+    sampleAnswer?: string | null;
+  },
+): Promise<InterviewQuestion> {
+  await delay(300);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  const nextId = getNextQuestionId();
+  const q: InterviewQuestion = {
+    id: nextId,
+    interviewAgentId: agentId,
+    questionText: data.questionText,
+    category: data.category,
+    difficulty: data.difficulty,
+    orderIndex: data.orderIndex,
+    estimatedTime: data.estimatedTime ?? 5,
+    isActive: true,
+    expectedKeywords: data.expectedKeywords ?? [],
+    focusAreas: data.focusAreas ?? [],
+    sampleAnswer: data.sampleAnswer ?? null,
+  };
+  list.push(q);
+  mockQuestionsByAgent.set(agentId, list);
+  return q;
+}
+
+export async function updateQuestion(
+  agentId: number,
+  questionId: number,
+  data: Partial<InterviewQuestion>,
+): Promise<InterviewQuestion> {
+  await delay(300);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  const idx = list.findIndex((q) => q.id === questionId);
+  if (idx === -1) throw new Error("Question not found");
+  list[idx] = {
+    ...list[idx],
+    ...data,
+    id: questionId,
+    interviewAgentId: agentId,
+  };
+  return list[idx];
+}
+
+export async function deleteQuestion(
+  agentId: number,
+  questionId: number,
+): Promise<void> {
+  await delay(200);
+  const list = mockQuestionsByAgent.get(agentId) ?? [];
+  const filtered = list.filter((q) => q.id !== questionId);
+  mockQuestionsByAgent.set(agentId, filtered);
+}
+
+/** Generate questions using AI based on agent details. Requires title, role, jobDescription, experienceLevel, focusAreas, totalQuestions to be filled. */
+export async function generateQuestionsByAI(
+  agentOrDetails: AgentFormDetails,
+): Promise<InterviewQuestion[]> {
+  await delay(800);
+
+  const title = agentOrDetails.title?.trim() ?? "";
+  const role = agentOrDetails.role?.trim() ?? "";
+  const jobDescription = agentOrDetails.jobDescription?.trim() ?? "";
+  const experienceLevel = agentOrDetails.experienceLevel ?? "";
+  const focusAreas = agentOrDetails.focusAreas ?? [];
+  const totalQuestions = agentOrDetails.totalQuestions ?? 0;
+  const estimatedDuration = agentOrDetails.estimatedDuration ?? 0;
+  const questionSelectionMode = agentOrDetails.questionSelectionMode;
+
+  if (
+    !title ||
+    !role ||
+    !jobDescription ||
+    !experienceLevel ||
+    focusAreas.length === 0 ||
+    totalQuestions < 1 ||
+    !estimatedDuration ||
+    !questionSelectionMode
+  ) {
+    throw new Error(
+      "Fill in title, role, job description, experience level, at least one focus area, and total questions before generating questions.",
+    );
+  }
+
+  return await apiClient.post<InterviewQuestion[]>(
+    "/interview-agent/generate-questions",
+    {
+      title,
+      role,
+      jobDescription,
+      experienceLevel,
+      focusAreas,
+      totalQuestions,
+      estimatedDuration,
+      questionSelectionMode,
+    },
+  );
 }
 
 export async function createInterviewAgent(data: {
   title: string;
   role: string;
   jobDescription: string;
+  openingMessage?: string;
   experienceLevel: ExperienceLevel;
+  questionSelectionMode?: QuestionSelectionMode;
   totalQuestions?: number;
   estimatedDuration?: number;
   focusAreas: string[];
@@ -145,35 +345,16 @@ export async function createInterviewAgent(data: {
   maxAttemptsPerCandidate?: number;
   deadline?: string | null;
   status?: InterviewAgentStatus;
+  questions: InterviewQuestion[];
 }): Promise<InterviewAgent> {
   await delay(400);
-  const agent: InterviewAgent = {
-    id: mockAgents.length + 1,
-    createdById: 2,
-    title: data.title,
-    role: data.role,
-    jobDescription: data.jobDescription,
-    experienceLevel: data.experienceLevel,
-    totalQuestions: data.totalQuestions ?? 6,
-    estimatedDuration: data.estimatedDuration ?? 30,
-    focusAreas: data.focusAreas,
-    maxCandidates: data.maxCandidates ?? 100,
-    maxAttemptsPerCandidate: data.maxAttemptsPerCandidate ?? 3,
-    deadline: data.deadline ?? null,
-    status: data.status ?? "DRAFT",
-    scheduledFor: null,
-    publishedAt: null,
-    isActive: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  mockAgents.push(agent);
+  const agent = await apiClient.post<InterviewAgent>("/interview-agent", data);
   return agent;
 }
 
 export async function updateInterviewAgent(
   id: number,
-  data: Partial<InterviewAgent>
+  data: Partial<InterviewAgent>,
 ): Promise<InterviewAgent> {
   await delay(300);
   const idx = mockAgents.findIndex((a) => a.id === id);
@@ -182,11 +363,48 @@ export async function updateInterviewAgent(
   return mockAgents[idx];
 }
 
-// ─── Candidate: Available agents (published) ───────────────────────────────────
+export async function deleteInterviewAgent(id: number): Promise<void> {
+  await delay(300);
+  await apiClient.delete(`/interview-agent/${id}`);
+}
+
+// ─── Candidate: Available agents (published, with HM name & company) ─────────────
+
+function withHiringManagerInfo(agent: InterviewAgent): InterviewAgent {
+  return {
+    ...agent,
+    createdBy: { name: mockHiringManagerUser.name },
+    companyName: mockHmProfile.companyName,
+  };
+}
 
 export async function getPublishedInterviewAgents(): Promise<InterviewAgent[]> {
   await delay(350);
-  return mockAgents.filter((a) => a.status === "PUBLISHED" && a.isActive);
+  const interviews = await apiClient.get<InterviewAgent[]>(
+    "/interview-agent/user/available-interviews",
+  );
+
+  return interviews;
+}
+
+export async function getInterviewAgentByIdForCandidate(
+  id: number,
+): Promise<InterviewAgent | null> {
+  const agent = await apiClient.get<InterviewAgent>(`/interview-agent/${id}`);
+
+  return agent ? withHiringManagerInfo(agent) : null;
+}
+
+/** How many times the current candidate has attempted this agent (for pre-start screen) */
+export async function getMyAttemptCountForAgent(
+  agentId: number,
+): Promise<number> {
+  await delay(200);
+  const currentCandidateId = 1; // from auth in real app
+  return mockSessions.filter(
+    (s) =>
+      s.interviewAgentId === agentId && s.candidateId === currentCandidateId,
+  ).length;
 }
 
 // ─── Candidate: My sessions & results ────────────────────────────────────────
@@ -198,7 +416,13 @@ const mockCandidates: { id: number; name: string; email: string }[] = [
 ];
 
 function getCandidateById(id: number) {
-  return mockCandidates.find((c) => c.id === id) ?? { id, name: "Unknown", email: "" };
+  return (
+    mockCandidates.find((c) => c.id === id) ?? {
+      id,
+      name: "Unknown",
+      email: "",
+    }
+  );
 }
 
 const mockResult: InterviewResult = {
@@ -211,7 +435,12 @@ const mockResult: InterviewResult = {
   communicationScore: 75,
   problemSolvingScore: 76,
   cultureFitScore: 80,
-  skillScores: { Algorithms: 85, "System Design": 68, Databases: 80, Communication: 75 },
+  skillScores: {
+    Algorithms: 85,
+    "System Design": 68,
+    Databases: 80,
+    Communication: 75,
+  },
   topStrengths: [
     "Strong technical knowledge",
     "Clear communication",
@@ -229,11 +458,18 @@ const mockResult: InterviewResult = {
       "Review system design fundamentals",
       "Practice explaining solutions concisely",
     ],
-    "day3-4": ["Work on edge case identification", "Study scalability patterns"],
-    "day5-6": ["Mock interviews with peers", "Deep dive into distributed systems"],
+    "day3-4": [
+      "Work on edge case identification",
+      "Study scalability patterns",
+    ],
+    "day5-6": [
+      "Mock interviews with peers",
+      "Deep dive into distributed systems",
+    ],
     day7: ["Take another mock interview", "Review and consolidate learnings"],
   },
-  detailedFeedback: "Overall solid performance with room to grow in system design.",
+  detailedFeedback:
+    "Overall solid performance with room to grow in system design.",
   transcriptSummary: "Candidate showed good fundamentals and communication.",
   totalQuestions: 6,
   questionsAnswered: 6,
@@ -345,7 +581,9 @@ export async function getMySessions(): Promise<CandidateInterviewSession[]> {
   return [...mockSessions];
 }
 
-export async function getSessionById(id: number): Promise<CandidateInterviewSession | null> {
+export async function getSessionById(
+  id: number,
+): Promise<CandidateInterviewSession | null> {
   await delay(200);
   const s = mockSessions.find((s) => s.id === id) ?? null;
   if (s) {
@@ -354,21 +592,37 @@ export async function getSessionById(id: number): Promise<CandidateInterviewSess
   return null;
 }
 
-export async function getResultBySessionId(sessionId: number): Promise<InterviewResult | null> {
+export async function getResultBySessionId(
+  sessionId: number,
+): Promise<InterviewResult | null> {
   await delay(200);
   const session = mockSessions.find((s) => s.id === sessionId);
   return session?.overallResult ?? null;
 }
 
-export async function startSession(interviewAgentId: number): Promise<CandidateInterviewSession> {
+export async function startSession(
+  interviewAgentId: number,
+): Promise<CandidateInterviewSession> {
   await delay(500);
+  const ids = await apiClient.post<CandidateInterviewSession>(`/interview/${interviewAgentId}`);
   const agent = mockAgents.find((a) => a.id === interviewAgentId);
-  if (!agent) throw new Error("Agent not found");
+  if (!agent) throw new Error("Interview not found or no longer available.");
+  const currentCandidateId = 1;
+  const myAttempts = mockSessions.filter(
+    (s) =>
+      s.interviewAgentId === interviewAgentId &&
+      s.candidateId === currentCandidateId,
+  ).length;
+  if (myAttempts >= agent.maxAttemptsPerCandidate) {
+    throw new Error(
+      `Maximum attempts (${agent.maxAttemptsPerCandidate}) reached for this interview.`,
+    );
+  }
   const nextId = Math.max(0, ...mockSessions.map((s) => s.id)) + 1;
   const newSession: CandidateInterviewSession = {
     id: nextId,
     interviewAgentId,
-    candidateId: 1,
+    candidateId: currentCandidateId,
     interviewId: 100 + nextId,
     status: "PENDING",
     startedAt: null,
@@ -384,38 +638,14 @@ export async function startSession(interviewAgentId: number): Promise<CandidateI
   return newSession;
 }
 
-// ─── Candidate: User metrics ─────────────────────────────────────────────────
-
-const mockMetrics: UserMetrics = {
-  id: 1,
-  userId: 1,
-  totalInterviews: 5,
-  completedInterviews: 4,
-  averageScore: 72,
-  scoreHistory: [
-    { date: "2025-01-10", score: 68 },
-    { date: "2025-01-15", score: 71 },
-    { date: "2025-01-20", score: 75 },
-    { date: "2025-01-25", score: 78 },
-  ],
-  skillProgress: {},
-  totalPracticeTime: 120,
-  avgInterviewDuration: 26,
-  strongestSkills: ["Algorithms", "Communication"],
-  improvingSkills: ["System Design"],
-  needsWorkSkills: ["Behavioral"],
-  lastInterviewDate: "2025-01-25T14:00:00Z",
-};
-
 export async function getMyMetrics(): Promise<UserMetrics> {
   await delay(350);
-  return { ...mockMetrics };
+  const userMetric = await apiClient.get<UserMetrics>("/user/dashboard");
+  return userMetric;
 }
 
-// ─── Hiring Manager: Sessions per agent (with candidate for leaderboard) ───────
-
 export async function getSessionsByAgentId(
-  agentId: number
+  agentId: number,
 ): Promise<CandidateInterviewSession[]> {
   await delay(350);
   const agent = mockAgents.find((a) => a.id === agentId);
@@ -431,16 +661,21 @@ export async function getSessionsByAgentId(
 /** Sessions for one candidate on one agent (for HM: candidate's attempts) */
 export async function getSessionsByAgentAndCandidate(
   agentId: number,
-  candidateId: number
+  candidateId: number,
 ): Promise<CandidateInterviewSession[]> {
   await delay(300);
   const agent = mockAgents.find((a) => a.id === agentId);
   return mockSessions
-    .filter((s) => s.interviewAgentId === agentId && s.candidateId === candidateId)
+    .filter(
+      (s) => s.interviewAgentId === agentId && s.candidateId === candidateId,
+    )
     .map((s) => ({
       ...s,
       interviewAgent: agent,
       candidate: getCandidateById(s.candidateId),
     }))
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 }

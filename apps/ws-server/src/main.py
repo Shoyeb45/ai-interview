@@ -10,9 +10,10 @@ from aiortc import MediaStreamTrack
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 import asyncio
 from src.websocket.websocket_conn import handle_websocket_message
-from src.core.helper import get_token
+from src.core.helper import get_token_and_session, send_over_ws
 from src.session.session import InterviewSession
 from src.manager.webrtc_audio_input import WebRTCAudioInput
+from src.interview_agent.flow_manager import InterviewFlowManager, SessionNotFoundError
 
 
 # Global states
@@ -23,11 +24,43 @@ async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
     print("WebSocket connection accepted")
 
-    user_id = get_token(str(ws.url))
-    print(f"[CHECKPOINT] user_connected user_id={user_id}")
+    token, session_id = get_token_and_session(str(ws.url))
 
-    session = InterviewSession(user_id)
-    webrtc_input = WebRTCAudioInput(ws, user_id, session)
+    # Validate token and sessionId are provided
+    if not token or not session_id:
+        await send_over_ws(ws, {
+            "type": "error",
+            "code": "MISSING_CREDENTIALS",
+            "message": "Missing token or session ID. Please start the interview from the interview page."
+        })
+        await ws.close(code=4001, reason="Missing token or session ID")
+        return
+
+    session = InterviewSession(token, str(session_id))
+    payload = session.verify_jwt()
+    if payload is None:
+        await send_over_ws(ws, {
+            "type": "error",
+            "code": "FORBIDDEN",
+            "message": "Invalid or expired access. Please sign in again."
+        })
+        await ws.close(code=4003, reason="Invalid or expired token")
+        return
+
+    # Load interview config from Redis
+    try:
+        session.flow_manager = InterviewFlowManager(str(session_id))
+    except SessionNotFoundError as e:
+        await send_over_ws(ws, {
+            "type": "error",
+            "code": "SESSION_EXPIRED",
+            "message": str(e)
+        })
+        await ws.close(code=4004, reason="Session expired or invalid")
+        return
+
+    print(f"[CHECKPOINT] user_connected user_id={session.user_id}")
+    webrtc_input = WebRTCAudioInput(ws, session.user_id, session)
     await webrtc_input.start_processor()
     
     @webrtc_input.pc.on('track')
