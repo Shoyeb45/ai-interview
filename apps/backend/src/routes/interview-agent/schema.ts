@@ -39,6 +39,10 @@ const generateQuestion = createInterviewAgent.omit({
     deadline: true,
 });
 
+const interviewAgentParam = z.object({
+    interviewAgentId: z.coerce.number()
+});
+
 export type InterviewAgentSchema = {
     CreateInterviewAgent: z.infer<typeof createInterviewAgent>;
     GenerateQuestion: z.infer<typeof generateQuestion>;
@@ -49,4 +53,5 @@ export default {
     createInterviewAgent,
     generateQuestion,
     questionCreate,
+    interviewAgentParam
 };
