@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Calendar } from "lucide-react";
 import { getMySessions, type MySessionItem } from "@/lib/userApi";
 import { getDecisionColor } from "@/lib/getDecisionColor";
+import { HiringDecision } from "@/types/schema";
 
 export default function CandidateResultsListPage() {
   const [sessions, setSessions] = useState<MySessionItem[]>([]);
@@ -60,7 +61,7 @@ export default function CandidateResultsListPage() {
               <div className="flex items-center gap-3">
                 {s.overallResult && (
                   <>
-                    <span className={`rounded-full px-3 py-1 text-sm font-medium ${getDecisionColor(s.overallResult.decision)}`}>
+                    <span className={`rounded-full px-3 py-1 text-sm font-medium ${getDecisionColor(s.overallResult.decision as HiringDecision)}`}>
                       {s.overallResult.decision}
                     </span>
                     <span className="text-xl font-bold text-gray-900">{s.overallResult.overallScore}%</span>
