@@ -19,13 +19,20 @@ from src.transport.websocket import WebSocketTransport
 from src.transport.webrtc_output import WebRTCOutput
 from src.transport.composite import CompositeTransport
 from src.services.redis.event_emitter import emit_abandon_interview
-
+from aiortc import RTCConfiguration, RTCIceServer
 active_sessions: dict[str, InterviewSession] = {}
 
 
 class WebRTCAudioInput:
     def __init__(self, ws: WebSocket, user_id: str, session: InterviewSession):
-        self.pc = RTCPeerConnection()
+        self.pc = RTCPeerConnection(
+            configuration=RTCConfiguration(
+                iceServers=[
+                    RTCIceServer(urls=["stun:stun.l.google.com:19302"]),
+                    # Add TURN server for production
+                ]
+            )
+        )
         self.user_id = user_id
         self.session = session
         self.tts_track = TTSAudioTrack()
