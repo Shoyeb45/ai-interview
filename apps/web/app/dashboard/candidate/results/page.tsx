@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Calendar } from "lucide-react";
-import { getMySessions } from "@/lib/mockApi";
-import type { CandidateInterviewSession } from "@/types/schema";
+import { Calendar } from "lucide-react";
+import { getMySessions, type MySessionItem } from "@/lib/userApi";
 import { getDecisionColor } from "@/lib/getDecisionColor";
 
 export default function CandidateResultsListPage() {
-  const [sessions, setSessions] = useState<CandidateInterviewSession[]>([]);
+  const [sessions, setSessions] = useState<MySessionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -16,6 +15,8 @@ export default function CandidateResultsListPage() {
     try {
       const list = await getMySessions();
       setSessions(list.filter((s) => s.overallResult != null));
+    } catch {
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -49,7 +50,7 @@ export default function CandidateResultsListPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="font-semibold text-gray-900">
-                  {s.interviewAgent?.title ?? `Interview #${s.interviewAgentId}`}
+                  {s.interviewAgent?.title ?? `Interview #${s.interviewAgent?.id}`}
                 </h2>
                 <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
