@@ -14,6 +14,7 @@ const router = Router();
 
 router.use(authorize(RoleCode.HIRING_MANAGER));
 
+
 router.get(
     '/:interviewAgentId/attempts/:userId',
     validator(schema.userInterviewParams, ValidationSource.PARAM),
@@ -28,7 +29,7 @@ router.get(
             interviewAgentId,
         );
 
-        new SuccessResponse('Fetched all attempts.', { attempts }).send(res);
+        new SuccessResponse('Fetched all attempts.', attempts).send(res);
     }),
 );
 

@@ -19,7 +19,7 @@ router.get(
 
         const leaderboard =
             await interviewAgentRepo.getLeaderboardByInterviewAgent(interviewAgentId);
-
+        
         new SuccessResponse(
             'Leaderboard fetched successfully.',
             leaderboard,

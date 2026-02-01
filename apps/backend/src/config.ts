@@ -46,6 +46,14 @@ export const redisConfig = {
     redisPassword: process.env.REDIS_PASSWORD,
     redisTls: process.env.REDIS_TLS === 'true' || false,
 };
+
+export const awsCred = {
+    awsRegion: process.env.AWS_REGION ?? "ap-south-1",
+    awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "", 
+    awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+    fromEmail: process.env.FROM_EMAIL!
+}
+
 export const logDirectory = process.env.LOG_DIRECTORY;
 
 export const dbUrl = process.env.DATABASE_URL ?? '';

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getHiringManagerProfile, updateHiringManagerProfile } from "@/lib/mockApi";
+import { getHiringManagerProfile, updateHiringManagerProfile } from "@/lib/hiringManagerApi";
 import type { HiringManagerInformation, CompanySize } from "@/types/schema";
 import { toast } from "sonner";
 import { Building2, Pencil, X } from "lucide-react";
@@ -32,6 +32,15 @@ export default function HiringManagerProfilePage() {
       const data = await getHiringManagerProfile();
       setProfile(data ?? null);
       if (data) setForm(data);
+    } catch (error: any) {
+      // Handle 404 or other errors gracefully
+      if (error?.response?.status === 404) {
+        setProfile(null);
+        toast.error("Profile not found. Please create your profile.");
+      } else {
+        console.error("Failed to load profile:", error);
+        toast.error("Failed to load profile");
+      }
     } finally {
       setLoading(false);
     }
@@ -50,8 +59,9 @@ export default function HiringManagerProfilePage() {
       toast.success("Profile updated");
       setEditing(false);
       load();
-    } catch {
-      toast.error("Failed to update profile");
+    } catch (error: any) {
+      console.error("Failed to update profile:", error);
+      toast.error(error?.response?.data?.message || "Failed to update profile");
     } finally {
       setSaving(false);
     }

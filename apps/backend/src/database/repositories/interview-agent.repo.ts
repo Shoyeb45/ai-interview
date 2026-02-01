@@ -243,7 +243,7 @@ async function getLeaderboardByInterviewAgent(
             completedAt: 'desc',
         },
     });
-
+    
     // Group sessions by candidate and calculate best score
     const candidateMap = new Map<
         number,
@@ -303,7 +303,7 @@ async function getLeaderboardByInterviewAgent(
 
     // Convert map to array and sort by best score (descending)
     const leaderboard = Array.from(candidateMap.values())
-        .filter((candidate) => candidate.completedAttempts > 0) // Only include candidates with at least one completed attempt
+        // .filter((candidate) => candidate.completedAttempts > 0) // Only include candidates with at least one completed attempt
         .sort((a, b) => b.bestScore - a.bestScore)
         .map((candidate, index) => ({
             rank: index + 1,
