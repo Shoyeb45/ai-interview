@@ -14,7 +14,7 @@ router.get(
     '/:interviewAgentId',
     validator(interviewAgentSchema.interviewAgentParam, ValidationSource.PARAM),
     asyncHandler<ProtectedRequest>(async (req, res) => {
-        const interviewAgentId = Number(req.user.id);
+        const interviewAgentId = Number(req.params.interviewAgentId);
         await verifyInterviewAgent(interviewAgentId);
 
         const leaderboard =

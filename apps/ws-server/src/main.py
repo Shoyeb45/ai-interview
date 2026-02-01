@@ -14,6 +14,7 @@ from src.core.helper import get_token_and_session, send_over_ws
 from src.session.session import InterviewSession
 from src.manager.webrtc_audio_input import WebRTCAudioInput
 from src.interview_agent.flow_manager import InterviewFlowManager, SessionNotFoundError
+from src.services.redis.event_emitter import emit_start_interview
 
 
 # Global states
@@ -60,6 +61,10 @@ async def websocket_endpoint(ws: WebSocket):
         return
 
     print(f"[CHECKPOINT] user_connected user_id={session.user_id}")
+
+    # Emit start_interview event for worker to update DB
+    emit_start_interview(session)
+
     webrtc_input = WebRTCAudioInput(ws, session.user_id, session)
     await webrtc_input.start_processor()
     

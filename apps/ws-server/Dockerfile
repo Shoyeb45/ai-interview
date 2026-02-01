@@ -53,4 +53,4 @@ EXPOSE 4500
 # -------------------------------
 # Run server
 # -------------------------------
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "4500"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

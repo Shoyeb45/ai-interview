@@ -157,17 +157,26 @@ Output format: End your response with exactly [NEXT] ONLY when moving to the nex
             if not current_context:
                 current_context = f"Question {self.current_question_index} (from focus areas)"
 
-        # Next question - what to ask when we advance
-        next_question_text = self._get_question_text_at(self.current_question_index)
-        if next_question_text:
-            llm_context["next_question"] = next_question_text
+        # Next question - what to ask when we advance (or closing if last)
+        next_question_text: Optional[str] = None
+        next_index = self.current_question_index
+        if next_index >= self.total_questions - 1 and self.current_question_index > 0:
+            # Advancing from last question - give closing, not next question
+            llm_context["next_question_instruction"] = (
+                "This was the last question. Provide a warm closing message thanking the candidate, "
+                "mentioning next steps (e.g., 'We'll be in touch'), and concluding the interview. End with [NEXT]."
+            )
         else:
-            mode = self.question_selection_mode.upper()
-            if mode == "AI_ONLY" or mode == "MIXED":
-                next_num = self.current_question_index + 1
-                llm_context["next_question_instruction"] = (
-                    f"Generate question {next_num} of {self.total_questions} based on job description and focus areas."
-                )
+            next_question_text = self._get_question_text_at(self.current_question_index)
+            if next_question_text:
+                llm_context["next_question"] = next_question_text
+            else:
+                mode = self.question_selection_mode.upper()
+                if mode == "AI_ONLY" or mode == "MIXED":
+                    next_num = self.current_question_index + 1
+                    llm_context["next_question_instruction"] = (
+                        f"Generate question {next_num} of {self.total_questions} based on job description and focus areas."
+                    )
 
         return current_context, next_question_text, system_prompt, llm_context
 
