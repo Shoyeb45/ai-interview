@@ -4,14 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getSessionById } from "@/lib/mockApi";
-import type { CandidateInterviewSession, InterviewResult as InterviewResultSchema } from "@/types/schema";
+import { getSessionResult } from "@/lib/hiringManagerApi";
+import type { HiringManagerSessionResult } from "@/lib/hiringManagerApi";
 import InterviewResultView from "@/components/InterviewResult";
 import type { InterviewResultData } from "@/types/interview";
+import { toast } from "sonner";
 
-function mapResultToDisplay(
-  r: InterviewResultSchema
-): InterviewResultData {
+function mapResultToDisplay(r: HiringManagerSessionResult): InterviewResultData {
   return {
     overallScore: r.overallScore,
     technicalScore: r.technicalScore,
@@ -19,10 +18,10 @@ function mapResultToDisplay(
     problemSolvingScore: r.problemSolvingScore,
     cultureFitScore: r.cultureFitScore,
     roleReadinessPercent: r.roleReadinessPercent,
-    decision: r.decision,
+    decision: r.decision as InterviewResultData["decision"],
     topStrengths: r.topStrengths,
     topWeaknesses: r.topWeaknesses,
-    improvementPlan: r.improvementPlan as unknown as InterviewResultData["improvementPlan"],
+    improvementPlan: r.improvementPlan as InterviewResultData["improvementPlan"],
     skillScores: r.skillScores,
     detailedFeedback: r.detailedFeedback,
     transcriptSummary: r.transcriptSummary,
@@ -38,15 +37,18 @@ export default function HiringManagerResultDetailPage() {
   const params = useParams();
   const agentId = Number(params.id);
   const sessionId = Number(params.sessionId);
-  const [session, setSession] = useState<CandidateInterviewSession | null>(null);
+  const [result, setResult] = useState<HiringManagerSessionResult | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!sessionId || isNaN(sessionId)) return;
     setLoading(true);
     try {
-      const data = await getSessionById(sessionId);
-      setSession(data ?? null);
+      const data = await getSessionResult(sessionId);
+      setResult(data ?? null);
+    } catch {
+      toast.error("Failed to load result");
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export default function HiringManagerResultDetailPage() {
     );
   }
 
-  if (!session) {
+  if (!result) {
     return (
       <div className="space-y-4">
         <Link
@@ -79,37 +81,27 @@ export default function HiringManagerResultDetailPage() {
     );
   }
 
-  if (!session.overallResult) {
-    return (
-      <div className="space-y-4">
-        <Link
-          href={`/dashboard/hiring-manager/agents/${agentId}/candidates/${session.candidateId}`}
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm font-medium"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to attempts
-        </Link>
-        <p className="text-gray-600">No result for this attempt yet.</p>
-      </div>
-    );
-  }
-
-  const data = mapResultToDisplay(session.overallResult);
-  const candidateName = session.candidate?.name ?? `Candidate ${session.candidateId}`;
+  const data = mapResultToDisplay(result);
+  const candidateName = result.candidateName ?? `Candidate`;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <Link
-          href={`/dashboard/hiring-manager/agents/${agentId}/candidates/${session.candidateId}`}
+          href={
+            result.candidateId
+              ? `/dashboard/hiring-manager/agents/${agentId}/candidates/${result.candidateId}`
+              : `/dashboard/hiring-manager/agents/${agentId}/leaderboard`
+          }
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm font-medium"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to attempts
+          {result.candidateId ? "Back to attempts" : "Back to leaderboard"}
         </Link>
         <span className="text-gray-400">|</span>
         <span className="text-sm text-gray-700">
-          {candidateName} — Attempt #{session.id}
+          {candidateName}
+          {result.candidateEmail && ` — ${result.candidateEmail}`}
         </span>
       </div>
       <InterviewResultView data={data} />

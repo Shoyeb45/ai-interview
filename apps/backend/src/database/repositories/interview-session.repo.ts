@@ -56,6 +56,15 @@ const endInterview = async (sessionId: number) => {
 }
 
 const abandonInterview = async (sessionId: number, abandonReason?: string) => {
+    const session = await prisma.candidateInterviewSession.findUnique({
+        where: { id: sessionId },
+        select: { status: true },
+    });
+    if (!session) return null;
+    // Never overwrite successful completion or cheated status with abandon
+    if (session.status === SessionStatus.COMPLETED || session.status === SessionStatus.CHEATED) {
+        return null;
+    }
     return await prisma.candidateInterviewSession.update({
         where: {
             id: sessionId,
@@ -68,9 +77,37 @@ const abandonInterview = async (sessionId: number, abandonReason?: string) => {
     });
 }
 
+const cheatInterview = async (sessionId: number, reason: string = 'tab_change_violation') => {
+    return await prisma.candidateInterviewSession.update({
+        where: {
+            id: sessionId,
+        },
+        data: {
+            status: SessionStatus.CHEATED,
+            abandonedAt: new Date(),
+            abandonReason: reason,
+        }
+    });
+}
+
+const incrementTabChangeCount = async (sessionId: number) => {
+    return await prisma.candidateInterviewSession.update({
+        where: {
+            id: sessionId,
+        },
+        data: {
+            tabChangeCount: {
+                increment: 1,
+            },
+        }
+    });
+}
+
 export default {
     getSessionsByUserId,
     endInterview,
     abandonInterview,
+    cheatInterview,
+    incrementTabChangeCount,
     startInterview
 };

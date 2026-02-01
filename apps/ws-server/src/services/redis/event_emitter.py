@@ -4,6 +4,7 @@ Stream key: interview_events (must match Node worker)
 """
 import json
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from src.services.redis import redis_client
@@ -54,6 +55,45 @@ def emit_abandon_interview(session, reason: str, conversation_history: List[Dict
         "conversationHistory": conversation_history or [],
     }
     return redis_client.xadd_event(STREAM_KEY, "abandon_interview", payload)
+
+
+def emit_cheat_interview(session, reason: str = "tab_change_violation") -> Optional[str]:
+    """Emit when proctoring detects cheating (e.g. 3+ tab changes)."""
+    ctx = _get_session_context(session)
+    if not ctx.get("sessionId"):
+        return None
+    payload = {**ctx, "reason": reason or "tab_change_violation"}
+    return redis_client.xadd_event(STREAM_KEY, "cheat_interview", payload)
+
+
+def emit_proctoring_tab_change(session) -> Optional[str]:
+    """Emit for audit when user changes tab (worker increments count, creates event)."""
+    ctx = _get_session_context(session)
+    if not ctx.get("sessionId"):
+        return None
+    return redis_client.xadd_event(STREAM_KEY, "proctoring_tab_change", ctx)
+
+
+def emit_proctoring_snapshot(
+    session,
+    face_present: bool = False,
+    movement_level: float = 0.0,
+    dominant_emotion: Optional[str] = None,
+    engagement_score: float = 0.5,
+) -> Optional[str]:
+    """Emit video analysis snapshot for metrics (every 3-4 seconds)."""
+    ctx = _get_session_context(session)
+    if not ctx.get("sessionId"):
+        return None
+    payload = {
+        **ctx,
+        "facePresent": face_present,
+        "movementLevel": movement_level,
+        "dominantEmotion": dominant_emotion or "neutral",
+        "engagementScore": engagement_score,
+        "snapshotAt": datetime.utcnow().isoformat() + "Z",
+    }
+    return redis_client.xadd_event(STREAM_KEY, "proctoring_snapshot", payload)
 
 
 def emit_question_evaluate(

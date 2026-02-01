@@ -10,9 +10,9 @@ import {
 } from "@/lib/interviewApi";
 
 export default function LiveInterviewWrapper({
-  interviewId,
+  sessionId,
 }: {
-  interviewId: string;
+  sessionId: string;
 }) {
   const router = useRouter();
   const [context, setContext] = useState<InterviewContext | null>(null);
@@ -45,7 +45,7 @@ export default function LiveInterviewWrapper({
     );
   }
 
-  if (!context?.sessionId) {
+  if (!context?.sessionId || String(context.sessionId) !== sessionId) {
     return (
       <ProtectedRoute>
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4 px-4">
@@ -66,7 +66,7 @@ export default function LiveInterviewWrapper({
   return (
     <ProtectedRoute>
       <div className="fixed inset-0 w-full h-full overflow-hidden bg-slate-50">
-        <VoiceChat interviewId={interviewId} context={context} />
+        <VoiceChat context={context} />
       </div>
     </ProtectedRoute>
   );

@@ -134,7 +134,7 @@ export default function InterviewStartPage() {
           JSON.stringify(context)
         );
       }
-      router.push(`/interview/${result.interviewId}/live`);
+      router.push(`/interview/${result.sessionId}/live`);
     } catch (err) {
       setStarting(false);
       const message = err instanceof Error ? err.message : "Failed to start interview. Please try again.";

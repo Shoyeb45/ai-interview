@@ -13,6 +13,7 @@ const statusColors: Record<string, string> = {
   COMPLETED: "bg-green-100 text-green-800",
   ABANDONED: "bg-red-50 text-red-700",
   CANCELLED: "bg-gray-100 text-gray-600",
+  CHEATED: "bg-red-100 text-red-800",
 };
 
 export default function CandidateSessionsPage() {
@@ -84,7 +85,7 @@ export default function CandidateSessionsPage() {
                 )}
                 {s.status === "PENDING" && (
                   <Link
-                    href={`/interview/${s.interviewId}/live`}
+                    href={`/interview/${s.id}/live`}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm"
                   >
                     Start
@@ -92,7 +93,7 @@ export default function CandidateSessionsPage() {
                 )}
                 {s.status === "COMPLETED" && s.overallResult && (
                   <Link
-                    href={`/dashboard/candidate/results/${s.id}`}
+                    href={`/interview/${s.id}/result`}
                     className="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 text-sm"
                   >
                     View result

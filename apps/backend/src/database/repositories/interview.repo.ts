@@ -10,13 +10,41 @@ const getDetailedInterviewResultBySession = async (sessionId: number) =>
             overallScore: true,
             technicalScore: true,
             communicationScore: true,
+            problemSolvingScore: true,
+            cultureFitScore: true,
+            decision: true,
             roleReadinessPercent: true,
             skillScores: true,
             topStrengths: true,
             topWeaknesses: true,
             improvementPlan: true,
+            detailedFeedback: true,
+            transcriptSummary: true,
+            totalQuestions: true,
+            questionsAnswered: true,
+            questionsSkipped: true,
+            avgResponseTime: true,
+            interviewDuration: true,
         }
     });
+
+const getSessionResultForHiringManager = async (sessionId: number, hiringManagerId: number) => {
+    const session = await prisma.candidateInterviewSession.findFirst({
+        where: {
+            id: sessionId,
+            interviewAgent: {
+                createdById: hiringManagerId,
+            },
+        },
+        include: {
+            overallResult: true,
+            candidate: {
+                select: { id: true, name: true, email: true },
+            },
+        },
+    });
+    return session;
+};
 
 interface UserAttempt {
   attemptNumber: number;
@@ -96,5 +124,6 @@ const initiateInterview = (interviewAgentId: number, userId: number) => {
 export default {
     getUserInterviewAttempts,
     getDetailedInterviewResultBySession,
+    getSessionResultForHiringManager,
     initiateInterview,
 };

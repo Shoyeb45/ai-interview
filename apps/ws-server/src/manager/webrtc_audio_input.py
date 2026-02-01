@@ -54,12 +54,22 @@ class WebRTCAudioInput:
         self.should_stop = asyncio.Event()
         self.connection_ready = asyncio.Event()
         self.audio_ready = asyncio.Event()
+        self.video_track_task = None  # for cleanup
 
     async def start_processor(self):
         await self.session.agent.processor.start()
 
     async def on_track(self, track: MediaStreamTrack):
         print('🎵 Track received:', track.kind)
+        if track.kind == 'video':
+            print('📹 Video track connected - starting video pipeline')
+            from src.media.video.pipeline import VideoPipeline
+            if not self.session.video_pipeline:
+                self.session.video_pipeline = VideoPipeline(self.session)
+            self.video_track_task = asyncio.create_task(
+                self.session.video_pipeline.process_video_track(track, self.should_stop)
+            )
+            return
         if track.kind != 'audio':
             return
         print('🎤 Audio track connected')
@@ -124,6 +134,12 @@ class WebRTCAudioInput:
     async def cleanup(self):
         print("🧹 Cleaning up connection...")
         self.should_stop.set()
+        if self.video_track_task and not self.video_track_task.done():
+            self.video_track_task.cancel()
+            try:
+                await self.video_track_task
+            except asyncio.CancelledError:
+                pass
         await self.session.agent.processor.stop()
         await asyncio.sleep(0.1)
         try:

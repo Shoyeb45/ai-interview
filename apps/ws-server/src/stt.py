@@ -202,6 +202,8 @@ class StreamingSpeechProcessor:
                 await send_over_ws(self.ws, {"type": "llm_response", "response": ai_response})
                 if self.tts_track:
                     await self._play_tts(ai_response)
+                # Send interview_ended event to trigger frontend redirect
+                await send_over_ws(self.ws, {"type": "interview_ended"})
                 return
 
             await send_over_ws(self.ws, {

@@ -33,6 +33,18 @@ interface AbandonInterviewPayload extends EndInterviewPayload {
     reason: string;
 }
 
+interface CheatInterviewPayload extends StartInterviewPayload {
+    reason: string;
+}
+
+interface ProctoringSnapshotPayload extends StartInterviewPayload {
+    facePresent: boolean;
+    movementLevel: number;
+    dominantEmotion?: string;
+    engagementScore: number;
+    snapshotAt: string;
+}
+
 interface QuestionEvaluatePayload extends StartInterviewPayload {
     questionNumber: number;
     question: string;
@@ -94,6 +106,43 @@ async function handleAbandonInterview(p: AbandonInterviewPayload): Promise<void>
     if (!sessionId || isNaN(sessionId)) return;
     await interviewSessionRepo.abandonInterview(sessionId, p.reason);
     logger.info('Interview abandoned', { sessionId, reason: p.reason });
+}
+
+async function handleCheatInterview(p: CheatInterviewPayload): Promise<void> {
+    const sessionId = Number(p.sessionId);
+    if (!sessionId || isNaN(sessionId)) return;
+    await interviewSessionRepo.cheatInterview(sessionId, p.reason ?? 'tab_change_violation');
+    logger.info('Interview marked as cheated', { sessionId, reason: p.reason });
+}
+
+async function handleProctoringTabChange(p: StartInterviewPayload): Promise<void> {
+    const sessionId = Number(p.sessionId);
+    if (!sessionId || isNaN(sessionId)) return;
+    const updated = await interviewSessionRepo.incrementTabChangeCount(sessionId);
+    await prisma.proctoringEvent.create({
+        data: {
+            sessionId,
+            eventType: 'TAB_CHANGE',
+        },
+    });
+    logger.info('Proctoring: tab change recorded', { sessionId, tabChangeCount: updated.tabChangeCount });
+}
+
+async function handleProctoringSnapshot(p: ProctoringSnapshotPayload): Promise<void> {
+    const sessionId = Number(p.sessionId);
+    if (!sessionId || isNaN(sessionId)) return;
+    const snapshotAt = p.snapshotAt ? new Date(p.snapshotAt) : new Date();
+    await prisma.proctoringSnapshot.create({
+        data: {
+            sessionId,
+            snapshotAt,
+            facePresent: p.facePresent ?? false,
+            movementLevel: p.movementLevel ?? 0,
+            dominantEmotion: p.dominantEmotion ?? null,
+            engagementScore: p.engagementScore ?? 0.5,
+        },
+    });
+    logger.debug('Proctoring snapshot stored', { sessionId });
 }
 
 async function handleQuestionEvaluate(p: QuestionEvaluatePayload): Promise<void> {
@@ -236,6 +285,25 @@ async function handleGenerateReport(p: GenerateReportPayload): Promise<void> {
               session.questionResults.length
             : 0.7;
 
+    const snapshots = await prisma.proctoringSnapshot.findMany({
+        where: { sessionId },
+    });
+    const proctoringMetrics =
+        snapshots.length > 0
+            ? {
+                  avgEngagement:
+                      snapshots.reduce(
+                          (acc: number, s: { engagementScore: number }) =>
+                              acc + s.engagementScore,
+                          0
+                      ) / snapshots.length,
+                  facePresentRatio:
+                      snapshots.filter(
+                          (s: { facePresent: boolean }) => s.facePresent
+                      ).length / snapshots.length,
+              }
+            : undefined;
+
     const report = await generateInterviewReport(
         history,
         jobDescription,
@@ -245,7 +313,8 @@ async function handleGenerateReport(p: GenerateReportPayload): Promise<void> {
         30,
         avgConfidence,
         0,
-        interviewDurationMinutes
+        interviewDurationMinutes,
+        proctoringMetrics
     );
 
     await interviewResultRepo.createInterviewResult({
@@ -295,6 +364,15 @@ async function handleInterviewEvent(parsed: ParsedEvent): Promise<void> {
             break;
         case 'abandon_interview':
             await handleAbandonInterview(p as unknown as AbandonInterviewPayload);
+            break;
+        case 'cheat_interview':
+            await handleCheatInterview(p as unknown as CheatInterviewPayload);
+            break;
+        case 'proctoring_tab_change':
+            await handleProctoringTabChange(p as unknown as StartInterviewPayload);
+            break;
+        case 'proctoring_snapshot':
+            await handleProctoringSnapshot(p as unknown as ProctoringSnapshotPayload);
             break;
         case 'question_evaluate':
             await handleQuestionEvaluate(p as unknown as QuestionEvaluatePayload);

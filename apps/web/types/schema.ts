@@ -21,7 +21,7 @@ export type ExperienceLevel =
   | "LEAD"
   | "PRINCIPAL";
 
-export type SessionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "ABANDONED" | "CANCELLED";
+export type SessionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "ABANDONED" | "CANCELLED" | "CHEATED";
 
 export type HiringDecision =
   | "STRONG_HIRE"

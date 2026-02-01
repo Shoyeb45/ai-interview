@@ -285,6 +285,11 @@ model CandidateInterviewSession {
   candidate      User           @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   interview      Interview      @relation(fields: [interviewId], references: [id], onDelete: Cascade)
 
+  // Proctoring
+  tabChangeCount    Int      @default(0) @map("tab_change_count")
+  proctoringEvents  ProctoringEvent[]
+  proctoringMetrics ProctoringSnapshot[]
+
   // Results
   questionResults CandidateQuestionResult[] // per-question scores
   overallResult   InterviewResult? // single overall result
@@ -302,6 +307,7 @@ enum SessionStatus {
   COMPLETED // finished normally
   ABANDONED // candidate left mid-way
   CANCELLED // cancelled before start (e.g. deadline passed)
+  CHEATED // proctoring violation (tab change 3+ times, etc.)
 }
 
 // ============================================
@@ -531,6 +537,43 @@ enum HiringDecision {
   BORDERLINE
   NO_HIRE
   STRONG_NO_HIRE
+}
+
+// ============================================
+// PROCTORING
+// ============================================
+
+model ProctoringEvent {
+  id        Int               @id @default(autoincrement())
+  sessionId Int               @map("session_id")
+  eventType ProctoringEventType @map("event_type")
+  metadata  Json? // optional extra data
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  session CandidateInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+enum ProctoringEventType {
+  TAB_CHANGE
+  FULLSCREEN_EXIT
+  CHEATED
+}
+
+model ProctoringSnapshot {
+  id          Int     @id @default(autoincrement())
+  sessionId   Int     @map("session_id")
+  snapshotAt  DateTime @map("snapshot_at")
+  facePresent Boolean @default(false) @map("face_present")
+  movementLevel Float @default(0) @map("movement_level") // 0–1
+  dominantEmotion String? @map("dominant_emotion") // neutral, happy, surprised, etc.
+  engagementScore Float @default(0.5) @map("engagement_score") // 0–1 for metrics
+
+  session CandidateInterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, snapshotAt])
 }
 
 // ============================================
