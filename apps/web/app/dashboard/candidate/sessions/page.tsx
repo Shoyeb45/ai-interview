@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Clock } from "lucide-react";
-import { getMySessions } from "@/lib/mockApi";
-import type { CandidateInterviewSession } from "@/types/schema";
+import { Calendar, Clock } from "lucide-react";
+import { getMySessions, type MySessionItem } from "@/lib/userApi";
 import { getDecisionColor } from "@/lib/getDecisionColor";
+import { HiringDecision } from "@/types/schema";
 
 const statusColors: Record<string, string> = {
   PENDING: "bg-gray-100 text-gray-700",
@@ -16,7 +16,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function CandidateSessionsPage() {
-  const [sessions, setSessions] = useState<CandidateInterviewSession[]>([]);
+  const [sessions, setSessions] = useState<MySessionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -24,6 +24,8 @@ export default function CandidateSessionsPage() {
     try {
       const list = await getMySessions();
       setSessions(list);
+    } catch {
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -57,9 +59,9 @@ export default function CandidateSessionsPage() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h2 className="font-semibold text-gray-900">
-                  {s.interviewAgent?.title ?? `Interview #${s.interviewAgentId}`}
+                  {s.interviewAgent?.title ?? `Interview #${s.interviewAgent?.id}`}
                 </h2>
-                <p className="text-sm text-gray-500 mt-0.5">{s.interviewAgent?.role}</p>
+                <p className="text-sm text-gray-500 mt-0.5">{s.interviewAgent?.role ?? ""}</p>
                 <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
                   <span className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
@@ -74,7 +76,7 @@ export default function CandidateSessionsPage() {
               <div className="flex items-center gap-3">
                 {s.overallResult && (
                   <>
-                    <span className={`rounded-full px-3 py-1 text-sm font-medium ${getDecisionColor(s.overallResult.decision)}`}>
+                    <span className={`rounded-full px-3 py-1 text-sm font-medium ${getDecisionColor(s.overallResult.decision as HiringDecision)}`}>
                       {s.overallResult.decision}
                     </span>
                     <span className="text-lg font-bold text-gray-900">{s.overallResult.overallScore}%</span>

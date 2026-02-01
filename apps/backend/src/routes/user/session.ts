@@ -17,7 +17,7 @@ router.get(
         const sessions = await interviewSessionRepo.getSessionsByUserId(
             req.user.id,
         );
-        new SuccessResponse('Interview sessions fetched.', { sessions }).send(res);
+        new SuccessResponse('Interview sessions fetched.', sessions).send(res);
     }),
 );
 

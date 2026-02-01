@@ -6,10 +6,14 @@ const getSessionsByUserId = async (userId: number) =>
         where: {
             candidateId: userId
         },
+        orderBy: { createdAt: 'desc' },
         select: {
+            id: true,
+            interviewId: true,
             status: true,
-            startedAt: true,
             createdAt: true,
+            startedAt: true,
+            completedAt: true,
             overallResult: {
                 select: {
                     overallScore: true,
@@ -20,9 +24,9 @@ const getSessionsByUserId = async (userId: number) =>
                 select: {
                     id: true,
                     title: true,
-                    role: true
-                }
-            }
+                    role: true,
+                },
+            },
         },
     });
 

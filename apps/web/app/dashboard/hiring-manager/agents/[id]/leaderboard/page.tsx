@@ -150,7 +150,7 @@ export default function LeaderboardPage() {
                   </td>
                   <td className="py-3 px-4 text-right">
                     <Link
-                      href={`/dashboard/hiring-manager/agents/${id}/candidates/${row.candidateId}`}
+                      href={`/dashboard/hiring-manager/agents/${id}/candidates/${row.candidateId}?name=${encodeURIComponent(row.candidateName)}&email=${encodeURIComponent(row.candidateEmail)}`}
                       className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
                     >
                       View attempts

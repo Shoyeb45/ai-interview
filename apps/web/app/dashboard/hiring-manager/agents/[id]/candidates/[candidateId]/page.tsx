@@ -1,31 +1,53 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
-import { getInterviewAgentById, getSessionsByAgentAndCandidate } from "@/lib/mockApi";
-import type { InterviewAgent, CandidateInterviewSession } from "@/types/schema";
+import { getInterviewAgentById } from "@/lib/mockApi";
+import apiClient from "@/lib/apiClient";
+import type { InterviewAgent } from "@/types/schema";
 import { getDecisionColor } from "@/lib/getDecisionColor";
+
+interface UserAttempt {
+  attemptNumber: number;
+  sessionId: number;
+  status: string;
+  date: string;
+  decision: string | null;
+  score: number | null;
+  interviewResultId: number | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  abandonedAt: string | null;
+}
 
 export default function CandidateAttemptsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const agentId = Number(params.id);
   const candidateId = Number(params.candidateId);
   const [agent, setAgent] = useState<InterviewAgent | null>(null);
-  const [sessions, setSessions] = useState<CandidateInterviewSession[]>([]);
+  const [attempts, setAttempts] = useState<UserAttempt[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const candidateName = searchParams.get("name") ?? `Candidate ${candidateId}`;
+  const candidateEmail = searchParams.get("email") ?? "";
 
   const load = useCallback(async () => {
     if (!agentId || !candidateId || isNaN(agentId) || isNaN(candidateId)) return;
     setLoading(true);
     try {
-      const [agentData, sessionsData] = await Promise.all([
+      const [agentData, attemptsData] = await Promise.all([
         getInterviewAgentById(agentId),
-        getSessionsByAgentAndCandidate(agentId, candidateId),
+        apiClient.get<UserAttempt[]>(
+          `/interview-result/${agentId}/attempts/${candidateId}`
+        ),
       ]);
       setAgent(agentData ?? null);
-      setSessions(sessionsData);
+      setAttempts(Array.isArray(attemptsData) ? attemptsData : []);
+    } catch {
+      setAttempts([]);
     } finally {
       setLoading(false);
     }
@@ -58,10 +80,6 @@ export default function CandidateAttemptsPage() {
     );
   }
 
-  const candidateName =
-    sessions[0]?.candidate?.name ?? `Candidate ${candidateId}`;
-  const candidateEmail = sessions[0]?.candidate?.email ?? "";
-
   return (
     <div className="space-y-6">
       <Link
@@ -82,7 +100,7 @@ export default function CandidateAttemptsPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {sessions.length === 0 ? (
+        {attempts.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
             <FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <p>No attempts for this candidate.</p>
@@ -100,54 +118,56 @@ export default function CandidateAttemptsPage() {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((s, index) => (
+              {attempts.map((a) => (
                 <tr
-                  key={s.id}
+                  key={a.sessionId}
                   className="border-b border-gray-100 hover:bg-gray-50/50"
                 >
                   <td className="py-3 px-4 font-medium text-gray-900">
-                    Attempt {index + 1}
+                    Attempt {a.attemptNumber}
                   </td>
                   <td className="py-3 px-4">
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        s.status === "COMPLETED"
+                        a.status === "COMPLETED"
                           ? "bg-green-100 text-green-800"
-                          : s.status === "IN_PROGRESS"
+                          : a.status === "IN_PROGRESS"
                           ? "bg-blue-100 text-blue-800"
+                          : a.status === "ABANDONED"
+                          ? "bg-amber-100 text-amber-800"
                           : "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {s.status}
+                      {a.status}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-600">
-                    {s.completedAt
-                      ? new Date(s.completedAt).toLocaleString()
-                      : s.startedAt
-                      ? new Date(s.startedAt).toLocaleString()
-                      : new Date(s.createdAt).toLocaleString()}
+                    {a.completedAt
+                      ? new Date(a.completedAt).toLocaleString()
+                      : a.startedAt
+                      ? new Date(a.startedAt).toLocaleString()
+                      : new Date(a.date).toLocaleString()}
                   </td>
                   <td className="py-3 px-4">
-                    {s.overallResult ? (
+                    {a.decision ? (
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getDecisionColor(
-                          s.overallResult.decision
+                          a.decision as Parameters<typeof getDecisionColor>[0]
                         )}`}
                       >
-                        {s.overallResult.decision}
+                        {a.decision}
                       </span>
                     ) : (
                       <span className="text-gray-400">—</span>
                     )}
                   </td>
                   <td className="py-3 px-4 text-right font-medium text-gray-900">
-                    {s.overallResult ? `${s.overallResult.overallScore}%` : "—"}
+                    {a.score != null ? `${a.score}%` : "—"}
                   </td>
                   <td className="py-3 px-4 text-right">
-                    {s.overallResult && (
+                    {a.interviewResultId && (
                       <Link
-                        href={`/dashboard/hiring-manager/agents/${agentId}/results/${s.id}`}
+                        href={`/dashboard/hiring-manager/agents/${agentId}/results/${a.sessionId}`}
                         className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
                       >
                         View report
