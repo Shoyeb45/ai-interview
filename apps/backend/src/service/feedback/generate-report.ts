@@ -28,7 +28,8 @@ export async function generateInterviewReport(
     avgResponseTime: number,
     avgConfidence: number,
     totalHintsUsed: number,
-    interviewDurationMinutes: number
+    interviewDurationMinutes: number,
+    proctoringMetrics?: { avgEngagement: number; facePresentRatio: number }
 ): Promise<ReportAnalysis> {
     const systemPrompt = `You are an expert interview evaluator. Generate a comprehensive interview report.
 
@@ -68,6 +69,7 @@ Metrics:
 - Avg confidence: ${avgConfidence}
 - Total hints used: ${totalHintsUsed}
 - Interview duration: ${interviewDurationMinutes} min
+${proctoringMetrics ? `- Proctoring: avg engagement ${(proctoringMetrics.avgEngagement * 100).toFixed(0)}%, face visible ${(proctoringMetrics.facePresentRatio * 100).toFixed(0)}% of snapshots (factor into culture fit / professionalism)` : ''}
 
 Generate the comprehensive report JSON.`;
 

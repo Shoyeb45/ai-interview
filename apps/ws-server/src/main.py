@@ -14,7 +14,29 @@ from src.core.helper import get_token_and_session, send_over_ws
 from src.session.session import InterviewSession
 from src.manager.webrtc_audio_input import WebRTCAudioInput
 from src.interview_agent.flow_manager import InterviewFlowManager, SessionNotFoundError
-from src.services.redis.event_emitter import emit_start_interview
+from src.services.redis.event_emitter import (
+    emit_start_interview,
+    emit_cheat_interview,
+    emit_proctoring_tab_change,
+)
+
+
+# Proctoring: per-session tab change count (in-memory)
+_proctoring_tab_counts: dict[str, int] = {}
+TAB_CHANGE_LIMIT = 3
+
+
+async def _on_proctoring_tab_change(session) -> bool:
+    """Handle tab change. Emit audit event, increment count. Return True if interview should end."""
+    sid = str(session.session_id)
+    _proctoring_tab_counts[sid] = _proctoring_tab_counts.get(sid, 0) + 1
+    count = _proctoring_tab_counts[sid]
+    emit_proctoring_tab_change(session)
+    if count >= TAB_CHANGE_LIMIT:
+        emit_cheat_interview(session, reason="tab_change_violation")
+        _proctoring_tab_counts.pop(sid, None)
+        return True
+    return False
 
 
 # Global states
@@ -79,7 +101,13 @@ async def websocket_endpoint(ws: WebSocket):
     # Handle WebSocket messages
     async def handle_messages():
         try:
-            await handle_websocket_message(ws, webrtc_input.pc, webrtc_input.should_stop)
+            await handle_websocket_message(
+                ws,
+                webrtc_input.pc,
+                webrtc_input.should_stop,
+                session=session,
+                on_proctoring_tab_change=_on_proctoring_tab_change,
+            )
         except WebSocketDisconnect:
             print("WebSocket disconnected")
         except Exception as e:

@@ -4,16 +4,36 @@ from aiortc import RTCPeerConnection, RTCSessionDescription
 from fastapi import WebSocket, WebSocketDisconnect
 
 
-async def handle_websocket_message(ws: WebSocket, pc: RTCPeerConnection, should_stop: asyncio.Event):
+async def handle_websocket_message(
+    ws: WebSocket,
+    pc: RTCPeerConnection,
+    should_stop: asyncio.Event,
+    session=None,
+    on_proctoring_tab_change=None,
+):
+    """Handle WebSocket messages. on_proctoring_tab_change(session) returns True if interview should end (cheated)."""
     try:
         while not should_stop.is_set():
             try:
-                # Add timeout so we can check should_stop periodically
                 message = await asyncio.wait_for(ws.receive_text(), timeout=1.0)
             except asyncio.TimeoutError:
-                continue  # Check should_stop and loop again
-                
+                continue
+
             data = json.loads(message)
+
+            # Proctoring: tab change - delegate to handler
+            if data.get("type") == "proctoring_event" and data.get("eventType") == "tab_change":
+                if session and on_proctoring_tab_change:
+                    should_end = await on_proctoring_tab_change(session)
+                    if should_end:
+                        await ws.send_text(
+                            json.dumps({
+                                "type": "interview_cheated",
+                                "reason": "Too many tab changes. Interview ended due to proctoring violation.",
+                            })
+                        )
+                        should_stop.set()
+                continue
 
             if data['type'] == 'offer':
                 offer = RTCSessionDescription(
