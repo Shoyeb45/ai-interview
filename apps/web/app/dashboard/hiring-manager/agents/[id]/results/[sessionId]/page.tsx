@@ -21,7 +21,7 @@ function mapResultToDisplay(r: HiringManagerSessionResult): InterviewResultData 
     decision: r.decision as InterviewResultData["decision"],
     topStrengths: r.topStrengths,
     topWeaknesses: r.topWeaknesses,
-    improvementPlan: r.improvementPlan as InterviewResultData["improvementPlan"],
+    improvementPlan: r.improvementPlan as unknown as InterviewResultData["improvementPlan"],
     skillScores: r.skillScores,
     detailedFeedback: r.detailedFeedback,
     transcriptSummary: r.transcriptSummary,
