@@ -54,6 +54,7 @@ export function useAuth() {
     try {
       const currentUser = await fetchCurrentUser();
       setUser(currentUser);
+      if (currentUser) apiClient.startTokenRefreshTimer();
     } catch (err) {
       console.error('Auth check failed', err);
       toast.error('Please login again.');
@@ -68,6 +69,7 @@ export function useAuth() {
   }, [refreshUser]);
 
   const logout = () => {
+    apiClient.stopTokenRefreshTimer();
     if (apiClient.getAccessToken()) {
       void apiClient.delete('/auth/signout').catch(() => {});
     }

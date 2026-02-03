@@ -45,7 +45,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         });
       }
       apiClient.setTokens(res.tokens);
-      //   setTokens(res.data.accessToken, res.data.refreshToken);
       onClose();
       // router.refresh(); // Refresh server components if needed
       router.push('/dashboard');

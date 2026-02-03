@@ -13,10 +13,28 @@ export interface ApiResponse<T> {
   message: string
 }
 
+/** Decode JWT payload without verification; returns exp in ms, or null if invalid. */
+function getAccessTokenExpiryMs(accessToken: string): number | null {
+  try {
+    const parts = accessToken.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(base64);
+    const decoded = JSON.parse(json) as { exp?: number };
+    if (typeof decoded.exp !== 'number') return null;
+    return decoded.exp * 1000;
+  } catch {
+    return null;
+  }
+}
+
 class ApiClient {
   private axiosInstance: AxiosInstance;
   private isRefreshing = false;
   private failedRequestsQueue: Array<(token: string) => void> = [];
+  private refreshTimerId: ReturnType<typeof setTimeout> | null = null;
+  private readonly REFRESH_BEFORE_MS = 60 * 1000; // refresh 1 min before expiry
 
   constructor() {
     this.axiosInstance = axios.create({
@@ -40,28 +58,63 @@ class ApiClient {
   public setTokens(tokens: Tokens): void {
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
+    this.startTokenRefreshTimer();
   }
 
   private clearTokens(): void {
+    this.stopTokenRefreshTimer();
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
   }
 
+  /** Start proactive refresh timer; call after login or when tokens are restored. */
+  public startTokenRefreshTimer(): void {
+    this.stopTokenRefreshTimer();
+    const accessToken = this.getAccessToken();
+    if (!accessToken) return;
+    const expMs = getAccessTokenExpiryMs(accessToken);
+    if (expMs == null) return;
+    const now = Date.now();
+    const refreshAt = expMs - this.REFRESH_BEFORE_MS;
+    if (refreshAt <= now) {
+      void this.refreshAccessToken().catch(() => {});
+      return;
+    }
+    this.refreshTimerId = setTimeout(() => {
+      this.refreshTimerId = null;
+      void this.refreshAccessToken().catch(() => {});
+    }, refreshAt - now);
+  }
+
+  /** Stop proactive refresh timer; call on logout. */
+  public stopTokenRefreshTimer(): void {
+    if (this.refreshTimerId != null) {
+      clearTimeout(this.refreshTimerId);
+      this.refreshTimerId = null;
+    }
+  }
+
   private async refreshAccessToken(): Promise<string> {
     const refreshToken = this.getRefreshToken();
+    const currentAccessToken = this.getAccessToken();
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
 
     try {
-      const response = await axios.post<{ accessToken: string; refreshToken: string }>(
+      const res = await axios.post<{ accessToken: string; refreshToken: string }>(
         `${API_BASE_URL}/auth/token/refresh`,
         { refreshToken },
-        { headers: { 'Content-Type': 'application/json' } }
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(currentAccessToken ? { Authorization: `Bearer ${currentAccessToken}` } : {}),
+          },
+        }
       );
 
-      const { accessToken, refreshToken: newRefreshToken = refreshToken } = response.data;
-      this.setTokens({accessToken, refreshToken: newRefreshToken});
+      const { accessToken, refreshToken: newRefreshToken = refreshToken } = res.data;
+      this.setTokens({ accessToken, refreshToken: newRefreshToken });
       return accessToken;
     } catch (error) {
       this.clearTokens();

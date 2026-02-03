@@ -22,7 +22,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, [user, loading, router]);
 
   if (loading) {
-    return < div>Authenticating</div>; // or your own loading UI
+    return <div>Authenticating</div>; // or your own loading UI
   }
 
   if (!user) {
