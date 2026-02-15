@@ -86,7 +86,12 @@ The demo showcases:
 
 This makes large-scale AI interviewing economically viable.
 
-![Architecture](https://res.cloudinary.com/ddfye0ekr/image/upload/v1768500226/Untitled-2025-11-28-0959_cwteq0.png)
+<p>
+    <img src="./public/architecture.png">
+    <i>Architecture Diagram</i>
+</p>
+
+
 ---
 
 ## 6. Why This Scales
